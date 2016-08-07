@@ -2,12 +2,12 @@
 
 ##**Agenda** 
 
-**Why**  
-**Hardware Perspective**  
-**Software Perspective**  
+[**Why**](#1)
+[**Hardware Perspective**](#2)
+[**Software Perspective**](#3)
 
 
-##**Why** 
+##**Why** <a id="1">
 
 According to the [Intel VT-d SPEC] [1], Section 2.5, IOMMU provides several
 advantages:  
@@ -15,7 +15,7 @@ advantages:
 1. Device protection and isolation  
 2. DMA remapping  
 
-##**Hardware Perspective**
+##**Hardware Perspective** <a id="2">
 
 This note focus on Device protection & isolation and DMA remapping.  
 
@@ -142,7 +142,11 @@ Context Entry format form [Intel VT-d SPEC] [1], Section 9.3
        Context Entry with the same DID could points to the same "Page Table"
 
 
-##**Software Perspective**
+##**Software Perspective** <a id="3">
+
+###**Initialization**
+
+###**Domains**
 
 
 [1]: http://www.intel.com/content/www/us/en/embedded/technology/virtualization/vt-directed-io-spec.html
