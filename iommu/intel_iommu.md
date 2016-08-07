@@ -13,7 +13,8 @@
 -------------
 
 According to the [Intel VT-d SPEC] [1], Section 2.5, IOMMU provides several
-advantages:
+advantages:  
+  
 1. Device protection and isolation  
 2. DMA remapping  
 
