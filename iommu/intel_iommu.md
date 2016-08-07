@@ -4,9 +4,9 @@
 **Agenda** 
 -------------
 
-Why
-Hardware Perspective
-Software Perspective
+**Why**  
+**Hardware Perspective**  
+**Software Perspective**  
 
 
 **Why** 
