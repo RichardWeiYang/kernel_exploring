@@ -2,10 +2,12 @@
 
 ##**Agenda** 
 
-[**Why**](#1)  
-[**Hardware Perspective**](#2)  
-[**Software Perspective**](#3)  
-
+* [**Why**](#1)  
+* [**Hardware Perspective**](#2)  
+ * [**Domain**](#2.1)  
+* [**Software Perspective**](#3)  
+ * [**Initialization**](#3.1)  
+ * [**Domains**](#3.1)  
 
 ##**Why** <a id="1">
 
@@ -96,7 +98,7 @@ for that device
                  |Bus #0                Root Entry |
                  +---------------------------------+
 
-###**Domain**
+###**Domain** <a id="2.1">
 
 For memory efficiency, several device could share the same device "Page
 Table", eg. they are assigned to the save Virtual Machine. This is called
@@ -144,9 +146,9 @@ Context Entry format form [Intel VT-d SPEC] [1], Section 9.3
 
 ##**Software Perspective** <a id="3">
 
-###**Initialization**
+###**Initialization** <a id="3.1">
 
-###**Domains**
+###**Domains** <a id="3.2">
 
 
 [1]: http://www.intel.com/content/www/us/en/embedded/technology/virtualization/vt-directed-io-spec.html
