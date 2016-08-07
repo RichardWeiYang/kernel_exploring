@@ -2,9 +2,9 @@
 
 ##**Agenda** 
 
-[**Why**](#1)
-[**Hardware Perspective**](#2)
-[**Software Perspective**](#3)
+[**Why**](#1)  
+[**Hardware Perspective**](#2)  
+[**Software Perspective**](#3)  
 
 
 ##**Why** <a id="1">
