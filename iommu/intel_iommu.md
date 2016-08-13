@@ -4,10 +4,11 @@
 
 * [**Why**](#1)  
 * [**Hardware Perspective**](#2)  
- * [**Domain**](#2.1)  
+    * [**Domain**](#2.1)
 * [**Software Perspective**](#3)  
- * [**Initialization**](#3.1)  
- * [**Domains**](#3.1)  
+    * [**Initialization**](#3.1)
+        * [Parse DMAR Table from ACPI](#3.1.1)
+    * [**Domains**](#3.1)
 
 ##**Why** <a id="1">
 
@@ -144,11 +145,130 @@ Context Entry format form [Intel VT-d SPEC] [1], Section 9.3
        Context Entry with the same DID could points to the same "Page Table"
 
 
-##**Software Perspective** <a id="3">
+##**Software Perspective** <a id="3">  
 
-###**Initialization** <a id="3.1">
+###**Initialization** <a id="3.1">  
 
-###**Domains** <a id="3.2">
+Brief initialization sequence:  
+
+```
+    intel_iommu_init()  
+        dmar_table_init()  
+            parse_dmar_table()  
+                dmar_table_detect()  
+                dmar_parse_one_drhd()  
+        init_dmars()  
+            iommu_init_domains()  
+            iommu_alloc_root_entry()  
+            iommu_set_root_entry()  
+            iommu_enable_translation()  
+            dma_ops = &intel_dma_ops  
+	    bus_set_iommu(&pci_bus_type, &intel_iommu_ops)  
+```
+
+It can be divided into two stages:  
+1. Parse DMAR Table from ACPI  
+2. Configure DRHD Entry  
+
+####**Parse DMAR Table from ACPI** <a id="3.1.1">  
+
+DMAR Table is accessed with ACPI interface.
+
+```c
+	#define ACPI_SIG_DMAR           "DMAR"	/* DMA Remapping table */
+	status = acpi_get_table_with_size(ACPI_SIG_DMAR, 0,
+				(struct acpi_table_header **)&dmar_tbl,
+				&dmar_tbl_size);
+```
+
+The DMAR table in ACPI looks like this:
+
+       +-------------------------------------------+
+       |signature                                  |   "DMAR"
+       |                                           |
+       +-------------------------------------------+
+       |length                                     |
+       |                                           |
+       +-------------------------------------------+
+       .                                           .
+       .                                           .
+       .                                           .
+       +-------------------------------------------+
+       |                                           |
+       |                                           |
+       +-------------------------------------------+
+       |Remapping Structure[]                      |
+       |                                           |
+       +-------------------------------------------+
+
+           DMAR Table Format
+
+For more detailed information, see [Intel VT-d SPEC] [1], Section 8.1.  
+
+From the code and structure defined in SPEC, I guess the ACPI table is  
+searched with the "signature". Then when it hits a "DMAR" table,  
+dmar_walk_dmar_table() will walk through the "Remapping Structure", which  
+contains the important information/configuration of the Intel IOMMU.  
+
+```c
+	ret = dmar_walk_dmar_table(dmar, &cb);
+```
+
+There are different kinds of Remapping Structure, see [Intel VT-d SPEC] [1], Section 8.2.  
+
+     +-----------+------------------------------------------------+
+     |Value      |Description                                     |
+     +-----------+------------------------------------------------+
+     |0          |DMA Remapping Hardware Unit Definition Structure| DRHD
+     +-----------+------------------------------------------------+
+     |1          |                                                |
+     +-----------+------------------------------------------------+
+     |2          |                                                |
+     +-----------+------------------------------------------------+
+     |3          |                                                |
+     +-----------+------------------------------------------------+
+     |4          |                                                |
+     +-----------+------------------------------------------------+
+     |>4         |                                                |
+     +-----------+------------------------------------------------+
+
+           Remapping Structure Type
+
+In all of them, Type 0 DRHD structure is what this article focus. And its  
+format is defined in [Intel VT-d SPEC] [1], Section 8.3.  
+
+
+       +-------------------------------------------+
+       |Tyep                                       |   "0"
+       |                                           |
+       +-------------------------------------------+
+       |length                                     |
+       |                                           |
+       +-------------------------------------------+
+       |Flags                                      |
+       |                                           |
+       +-------------------------------------------+
+       |Reserved                                   |
+       |                                           |
+       +-------------------------------------------+
+       |Segment Number                             |
+       |                                           |
+       +-------------------------------------------+
+       |Register Base Address                      |   Familiar?
+       |                                           |
+       +-------------------------------------------+
+       |Device Scope[]                             |
+       |                                           |
+       +-------------------------------------------+
+
+        DRHD Format
+
+Encounter the "Register Base Address" again~ This points to the configuration  
+space of this DRHD unit. All the secrets live here. For more detail in this  
+region, see [Intel VT-d SPEC] [1], Section 10.  
+
+
+###**Domains** <a id="3.2">  
 
 
 [1]: http://www.intel.com/content/www/us/en/embedded/technology/virtualization/vt-directed-io-spec.html
