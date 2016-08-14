@@ -276,18 +276,18 @@ The progress of configuring the Page Table happens in the whole life time of a
 device.  
 
 At boot time, it does two basic things:  
-1. Allocate Root Entry Table and set it  
++ Allocate Root Entry Table and set it  
 
-'''c
+```c
 	iommu_alloc_root_entry()
 	iommu_set_root_entry()
-'''
+```
 
-2. Enable the Translation  
++ Enable the Translation  
 
-'''c
+```c
 	iommu_enable_translation()
-'''
+```
 
 ###**Domains** <a id="3.2">  
 
