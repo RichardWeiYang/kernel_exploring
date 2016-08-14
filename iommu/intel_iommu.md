@@ -8,6 +8,7 @@
 * [**Software Perspective**](#3)  
     * [**Initialization**](#3.1)
         * [Parse DMAR Table from ACPI](#3.1.1)
+        * [Configure DRHD Entry](#3.1.2)
     * [**Domains**](#3.1)
 
 ##**Why** <a id="1">
@@ -267,6 +268,26 @@ Encounter the "Register Base Address" again~ This points to the configuration
 space of this DRHD unit. All the secrets live here. For more detail in this  
 region, see [Intel VT-d SPEC] [1], Section 10.  
 
+####**Configure DRHD Entry** <a id="3.1.2">  
+
+After kernel gets basic information of the IOMMU device, it will configure DMA  
+mapping through "Register Base Address". One word, the DMA mapping Page Table.  
+The progress of configuring the Page Table happens in the whole life time of a  
+device.  
+
+At boot time, it does two basic things:  
+1. Allocate Root Entry Table and set it  
+
+'''c
+	iommu_alloc_root_entry()
+	iommu_set_root_entry()
+'''
+
+2. Enable the Translation  
+
+'''c
+	iommu_enable_translation()
+'''
 
 ###**Domains** <a id="3.2">  
 
