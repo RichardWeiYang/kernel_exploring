@@ -1,6 +1,13 @@
 # Summary
 
-* [Introduction](README.md)
-* [Chapter1](brief_tutorial_on_kbuild/00_index.md)
-    * [Section1.1](brief_tutorial_on_kbuild/01_build_your_first_kernel.md)
-
+* [前言](README.md)
+* [老司机带你探索内核编译系统](brief_tutorial_on_kbuild/00_index.md)
+    * [编译出你的第一个内核](brief_tutorial_on_kbuild/01_build_your_first_kernel.md)
+    * [内核编译中的小目标](brief_tutorial_on_kbuild/02_common_targets_in_kernel.md)
+    * [可能是kbuild中最直接的小目标 – help](brief_tutorial_on_kbuild/03_first_target_help.md)
+    * [使用了一个kbuild函数的目标 – cscope](brief_tutorial_on_kbuild/04_one_example_of_kbuild_function_cscope.md)
+    * [内核中单个.o文件的编译过程](brief_tutorial_on_kbuild/05_rules_for_single_object.md)
+    * [根目录vmlinux的编译过程](brief_tutorial_on_kbuild/06_building_vmlinux_under_root.md)
+    * [启动镜像bzImage的前世今生](brief_tutorial_on_kbuild/07_rules_for_bzImage.md)
+    * [setup.bin的诞生记](brief_tutorial_on_kbuild/08_rule_for_setupbin.md)
+    * [真假vmlinux–由vmlinux.bin揭开的秘密](brief_tutorial_on_kbuild/09_rule_for_vmlinux_bin.md)
