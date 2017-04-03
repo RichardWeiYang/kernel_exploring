@@ -96,17 +96,17 @@
 
 送君千里，终须一别，我们来日江湖再见～
 
-[1]: http://blog.csdn.net/richardysteven/article/details/52502734
-[2]: http://blog.csdn.net/richardysteven/article/details/52395737
-[3]: http://blog.csdn.net/RichardYSteven/article/details/57973554
+[1]: /brief_tutorial_on_kbuild/06_building_vmlinux_under_root.md
+[2]: /brief_tutorial_on_kbuild/07_rules_for_bzImage.md
+[3]: /brief_tutorial_on_kbuild/09_rule_for_vmlinux_bin.md
 [4]: http://blog.csdn.net/richardysteven/article/details/52551443
 [5]: http://blog.csdn.net/richardysteven/article/details/52420936
 [6]: http://blog.csdn.net/richardysteven/article/details/52906049
 [7]: http://blog.csdn.net/richardysteven/article/details/52908436
 [8]: https://www.gnu.org/software/make/manual/make.html#Rule-Introduction
-[9]: http://blog.csdn.net/RichardYSteven/article/details/56480485
-[10]: http://blog.csdn.net/RichardYSteven/article/details/56482735
-[11]: http://blog.csdn.net/RichardYSteven/article/details/56666283
-[12]: http://blog.csdn.net/RichardYSteven/article/details/56666514
-[13]: http://blog.csdn.net/RichardYSteven/article/details/56833038
-[14]: http://blog.csdn.net/RichardYSteven/article/details/57958264
+[9]: /brief_tutorial_on_kbuild/01_build_your_first_kernel.md
+[10]: /brief_tutorial_on_kbuild/02_common_targets_in_kernel.md
+[11]: /brief_tutorial_on_kbuild/03_first_target_help.md
+[12]: /brief_tutorial_on_kbuild/05_rules_for_single_object.md
+[13]: /brief_tutorial_on_kbuild/04_one_example_of_kbuild_function_cscope.md
+[14]: /brief_tutorial_on_kbuild/08_rule_for_setupbin.md
