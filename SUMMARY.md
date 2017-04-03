@@ -11,3 +11,6 @@
     * [启动镜像bzImage的前世今生](brief_tutorial_on_kbuild/07_rules_for_bzImage.md)
     * [setup.bin的诞生记](brief_tutorial_on_kbuild/08_rule_for_setupbin.md)
     * [真假vmlinux–由vmlinux.bin揭开的秘密](brief_tutorial_on_kbuild/09_rule_for_vmlinux_bin.md)
+    * [linux kernel makefile中的那些小伙伴们](brief_tutorial_on_kbuild/10_those_buddy_in_kbuild.md)
+    * [常见内核目标都是在哪里？](brief_tutorial_on_kbuild/11_location_of_common_targets.md)
+    * [内核编译过程的调试小窍门](brief_tutorial_on_kbuild/12_debug_tips.md)
