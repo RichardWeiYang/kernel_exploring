@@ -42,7 +42,7 @@ make menuconfig
 
 执行完，你可以看到如下的配置界面。
 
-![这里写图片描述](http://img.blog.csdn.net/20170222105426439?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvUmljaGFyZFlTdGV2ZW4=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast)
+![这里写图片描述](/brief_tutorial_on_kbuild/menuconfig.png)
 
 知道为啥我喜欢用这个了吧，因为这有个图形界面。虽然有好多看不懂，但是毕竟有些你是能猜出个大概意思的。
 
@@ -87,4 +87,3 @@ reboot
 ```
 
 好了，等下次机器起来，那就是一个崭新的世界了。
-
