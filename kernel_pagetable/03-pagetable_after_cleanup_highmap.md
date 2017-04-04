@@ -146,6 +146,6 @@ KI = 0xa0000000 - 0x80000000
 
 用图来看，应该能够更清楚一些
 
-![这里写图片描述](/kernel_pagetalbe/pagetable_after_cleanup_highmap.png)
+![这里写图片描述](/kernel_pagetable/pagetable_after_cleanup_highmap.png)
 
 感觉离真相又近了一步～
