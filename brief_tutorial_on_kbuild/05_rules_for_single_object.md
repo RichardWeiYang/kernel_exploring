@@ -243,5 +243,5 @@ cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 好了，这下真的要歇一歇了。吃个大餐慰劳一下自己吧～
 
 [1]: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2aedcd098a9448b11eab895ee79acf519686555a
-[2]: http://blog.csdn.net/richardysteven/article/details/56833038
+[2]: /brief_tutorial_on_kbuild/04_one_example_of_kbuild_function_cscope.md
 [3]: http://linuxcommand.org/man_pages/cd1.html

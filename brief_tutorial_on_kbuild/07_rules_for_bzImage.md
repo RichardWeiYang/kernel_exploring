@@ -187,4 +187,4 @@ bzImage的两个组成部分vmlinux.bin和setup.bin又是怎么出现的呢？
 路漫漫其修远兮，吾将上下而求索
 
 
-[1]: http://blog.csdn.net/richardysteven/article/details/56482735
+[1]: /brief_tutorial_on_kbuild/02_common_targets_in_kernel.md

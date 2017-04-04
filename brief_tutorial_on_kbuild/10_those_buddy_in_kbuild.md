@@ -1,6 +1,6 @@
 这篇文章是内核编译探索的重要知识点汇总，类似一个工具，列举了我所见到的一些target, rule. 以此希望对内核编译更进一步了解。
 
-然而如果没有实际内核编译的经验，可能会觉得比较枯燥。建议从这个[内核编译探索系列][1]开始阅读。
+然而如果没有实际内核编译的经验，可能会觉得比较枯燥。建议从这个[内核编译探索系列][2]开始阅读。
 
 # <font color=#8b0000>稍微谈一点架构</font>
 
@@ -19,16 +19,16 @@
      |  +-- Makefile
      |  |   
      |  +-+ ext4
-     |    | 
-     |    +-- Makefile 
+     |    |
+     |    +-- Makefile
      |      
      +--+ kernel   
      |  |   
      |  +-- Makefile
      |  |   
      |  +-+ sched
-     |    | 
-     |    +-- Makefile 
+     |    |
+     |    +-- Makefile
      |      
      +--    
 
@@ -73,7 +73,7 @@ if_changed = $(if $(strip $(any-prereq) $(arg-check)),                       \
 
 首先这是个if语句， 当条件为真，则执行一个，若为假，则执行另一个。这么来看，逐个击破～
 
-###<font color=#8b0000>判断条件</font> 
+###<font color=#8b0000>判断条件</font>
 ```
 $(strip $(any-prereq) $(arg-check))
 ```
@@ -109,7 +109,7 @@ arg-check = $(filter-out $(subst $(space),$(space_escape),$(strip $(cmd_$@))), \
 还真么怎么懂，除了注释。。。
 
 总体上看，就是比较了下两个字符串，去掉一样的。那到底是哪两个字符串呢？
-折腾了一下，终于有点眉目了。 
+折腾了一下，终于有点眉目了。
 
 cmd_$1 这个$1是 call_changed函数的第一个参数，在这个例子里面展开后就是 cmd_image, 这个在arch/x86/boot/Makefile中定义。
 
@@ -143,7 +143,7 @@ endif
 	$(echo-cmd) $(cmd_$(1));     \
 	printf '%s\n' 'cmd_$@ := $(make-cmd)' > $(dot-target).cmd)
 ```
- 
+
  其中有三个重要的变量，
 
 1. $(echo-cmd) 显示的内容，就是make的时候屏幕上打印  
@@ -169,7 +169,7 @@ cmd_image = $(obj)/tools/build $(obj)/setup.bin $(obj)/vmlinux.bin \
 
 > BUILD   arch/x86/boot/bzImage
 
-好了，那来看看最后一个变量 
+好了，那来看看最后一个变量
 ```
 ###
 # Name of target with a '.' as filename prefix. foo/bar.o => foo/.bar.o
@@ -181,7 +181,7 @@ dot-target = $(dir $@).$(notdir $@)
 So~ I guess you get it :)
 
 # <font color=#8b0000>特殊目标和变量</font>
-##<font color=#8b0000>Force目标</font> 
+##<font color=#8b0000>Force目标</font>
 这是一个挺有意思的target。在我看来，make会自动按照依赖关系找到哪些目标是需要更新的。但是内核中，偏偏要加上这个目标来强制去执行某个规则。
 
 ```
@@ -206,12 +206,12 @@ $(obj)/bzImage: $(obj)/setup.bin $(obj)/vmlinux.bin $(obj)/tools/build FORCE
 
 当你把FORCE从这条规则中拿掉，那么在依赖没有更新时， 则不会打印这条输出。从这点可以看出，FORCE对编译过程产生的作用。
 
-##<font color=#8b0000>arg-check和cmd_$@目标</font> 
+##<font color=#8b0000>arg-check和cmd_$@目标</font>
 这两个用于判断某个目标的编译命令是否有变化，定义在scripts/Kbuild.include 和 $(dot-target).cmd文件中。
 
-详细可以参考本文if_changed_xxx 和 cmd-files小节。 
+详细可以参考本文if_changed_xxx 和 cmd-files小节。
 
-##<font color=#8b0000>cmd-files和targets目标</font> 
+##<font color=#8b0000>cmd-files和targets目标</font>
 
 这两个变量定义在根目录Makefile中, 从现在理解来看 是为了arg-check和cmd_$@变量服务的。
 
@@ -239,8 +239,8 @@ endif
 ```
 ~/git/linux$ cat .vmlinux.cmd
 cmd_vmlinux := /bin/bash scripts/link-vmlinux.sh ld -m elf_x86_64 --emit-relocs --build-id
- 
-~/git/linux$ cat arch/x86/boot/.bzImage.cmd 
+
+~/git/linux$ cat arch/x86/boot/.bzImage.cmd
 cmd_arch/x86/boot/bzImage := arch/x86/boot/tools/build arch/x86/boot/setup.bin arch/x86/boot/vmlinux.bin arch/x86/boot/zoffset.h arch/x86/boot/bzImage
 ```
 
@@ -473,4 +473,4 @@ $(call multi_depend, $(multi-used-m), .o, -objs -y -m)
 从link_multi_deps的定义可以看出来，有三种写法 -objs, -y, -m。
 
 [1]: https://www.gnu.org/software/make/manual/html_node/Force-Targets.html
-[2]: http://blog.csdn.net/richardysteven/article/details/52930533
+[2]: /brief_tutorial_on_kbuild/00_index.md

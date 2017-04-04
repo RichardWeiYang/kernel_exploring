@@ -126,5 +126,5 @@ esac
 
 虽然这么些在理解上增加了一些难度，不过也经过了一些些努力就能水落石出。若能真的理解，就已经做好了kbuild系统探索的基本准备了。
 
-[1]: http://blog.csdn.net/richardysteven/article/details/56666283
+[1]: /brief_tutorial_on_kbuild/03_first_target_help.md
 [2]: https://www.gnu.org/software/make/manual/html_node/Call-Function.html
