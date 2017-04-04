@@ -212,7 +212,7 @@ PS：感觉快不够用了啊
 
 来看看映射完物理地址后的页表吧。
 
-![这里写图片描述](/kernel_pagetalbe/map_whole_memory.png)
+![这里写图片描述](/kernel_pagetable/map_whole_memory.png)
 
 细心的朋友可能已经注意到了，这次改写的是init_level4_pgt，而不是之前的early_level4_pgt了。
 
