@@ -214,6 +214,8 @@ PS：感觉快不够用了啊
 
 ![这里写图片描述](/kernel_pagetable/map_whole_memory.png)
 
+这次最关键的变化就是init_level4_pgt[272]这一项以及之后的内容。在这里映射了系统的整个物理地址。
+
 细心的朋友可能已经注意到了，这次改写的是init_level4_pgt，而不是之前的early_level4_pgt了。
 
 好，可以休息一下了～
