@@ -26,8 +26,6 @@ Intel的手册上写的非常详细，我就截取一张图做示例。
 
 而出于某些原因，内核只留下了_text到_brk_end这段空间的映射。其余的映射都清零了。
 
-
-
 [cleanup_highmap之后的页表][3]
 
 ![这里写图片描述](/kernel_pagetable/pagetable_after_cleanup_highmap.png)
@@ -45,6 +43,36 @@ Intel的手册上写的非常详细，我就截取一张图做示例。
 这个图和上面的是一样的，没有变化。关键变化在cr3的内容，而不是页表本身。
 
 内核页表是否还会增正和变化还有待进一步探索，有了我再来改～
+
+# 代码大汇总
+
+```
+    /* use pgtable
+     * arch/x86/boot/compressed/head_64.S
+     */
+    leal	pgtable(%ebx), %eax
+    movl	%eax, %cr3
+
+    /* use early_level4_pgt
+     * arch/x86/kernel/head_64.S
+     */
+    movq	$(early_level4_pgt - __START_KERNEL_map), %rax
+    addq	phys_base(%rip), %rax
+    movq	%rax, %cr3
+
+    /* set init_level4_pgt kernel high mapping */
+    x86_64_start_kernel()
+        init_level4_pgt[511] = early_level4_pgt[511];
+
+    start_kernel()
+        setup_arch()
+            /* cleanup highmap */
+            cleanup_highmap()
+            /* map whole memory space */
+            init_mem_mapping()
+            /* switch to init_level4_pgt*/
+            load_cr3(swapper_pg_dir);
+```
 
 [1]: /kernel_pagetable/01-pagetable_before_decompressed.md
 [2]: /kernel_pagetable/02-pagetable_compiled_in.md

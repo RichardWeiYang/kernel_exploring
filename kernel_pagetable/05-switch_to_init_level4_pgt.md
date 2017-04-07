@@ -76,68 +76,11 @@ index 372aad2..ba19480 100644
 
 好了，内核页表切换完成。进入到init_level4_pgt统治的时代了。
 
-# 打印页表
+# 补充细节
 
-页表切换了，那都切换成什么样子了呢？
+之前内核都是使用early_level4_pgt这个页表的，那和init_level4_pgt有什么关系呢？
 
-先来看一下代码
-
-```
-diff --git a/arch/x86/mm/init.c b/arch/x86/mm/init.c
-index 372aad2..49acd9a 100644
---- a/arch/x86/mm/init.c
-+++ b/arch/x86/mm/init.c
-@@ -577,7 +577,8 @@ static void __init memory_map_bottom_up(unsigned long map_start,
-
- void __init init_mem_mapping(void)
- {
--	unsigned long end;
-+	unsigned long end, pud;
-+	int i, j;
-
- 	probe_page_size_mask();
-
-@@ -620,6 +621,18 @@ void __init init_mem_mapping(void)
- #endif
-
- 	load_cr3(swapper_pg_dir);
-+	for (i = 0; i < 512; i++) {
-+		if (init_level4_pgt[i].pgd) {
-+			printk(KERN_ERR "%s: init_level4_pgt[%d] 0x%lx\n", __func__, i, init_level4_pgt[i].pgd);
-+			pud = init_level4_pgt[i].pgd;
-+			pud = (unsigned long)__va(pud & 0xfffff000);
-+			for (j = 0; j < 512; j++) {
-+				if (*(unsigned long *)(pud + j * 8)) {
-+					printk(KERN_ERR "%s: \t pud[%d] = %lx\n", __func__, j, *(unsigned long *)(pud + j*8));
-+				}
-+			}
-+		}
-+	}
- 	__flush_tlb_all();
-
- 	early_memtest(0, max_pfn_mapped << PAGE_SHIFT);
-```
-
-其实就是遍历init_level4_pgt，如果不是空就再往下走一层。
-
-那来看看打出来的是啥
-
-```
-[    0.000000] init_mem_mapping: init_level4_pgt[272] 0x2047067
-[    0.000000] init_mem_mapping: 	 pud[0] = 2048067
-[    0.000000] init_mem_mapping: 	 pud[1] = 13ffff067
-[    0.000000] init_mem_mapping: 	 pud[2] = 13fffe067
-[    0.000000] init_mem_mapping: 	 pud[4] = 204a067
-[    0.000000] init_mem_mapping: init_level4_pgt[511] 0x1c09067
-[    0.000000] init_mem_mapping: 	 pud[510] = 1c0a063
-[    0.000000] init_mem_mapping: 	 pud[511] = 1c0b067
-```
-
-恩，先看后面这init_level4_pgt[511]的内容。回顾一下这张图。
-
-![这里写图片描述](/kernel_pagetable/switch_to_init_level4_pgt.png)
-
-再来看这段代码。
+来来看看这段代码。
 
 ```
 asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
@@ -156,7 +99,7 @@ asmlinkage __visible void __init x86_64_start_kernel(char * real_mode_data)
 ```
 
 在这段代码中，init_level4_pgt[511]设置成了early_level4_pgt一样的值。
-而在early_level4_pgt[511]保存的是level3_kernel_pgt，继而又保存了level2_kernel_gpt。而他们俩正好差一个页。
 
+好了这下清楚了，从本质上讲，这两个页表没有什么区别，本次的页表和之前的页表样子没有变。
 
 [1]: http://blog.csdn.net/richardysteven/article/details/52629731#t16
