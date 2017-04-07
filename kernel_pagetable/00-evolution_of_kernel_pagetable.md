@@ -42,9 +42,7 @@ Intel的手册上写的非常详细，我就截取一张图做示例。
 
 这个图和上面的是一样的，没有变化。关键变化在cr3的内容，而不是页表本身。
 
-内核页表是否还会增正和变化还有待进一步探索，有了我再来改～
-
-# 代码大汇总
+# 页表成长大汇总
 
 ```
     /* use pgtable
@@ -68,11 +66,16 @@ Intel的手册上写的非常详细，我就截取一张图做示例。
         setup_arch()
             /* cleanup highmap */
             cleanup_highmap()
-            /* map whole memory space */
             init_mem_mapping()
-            /* switch to init_level4_pgt*/
-            load_cr3(swapper_pg_dir);
+                /* map whole memory space */
+                memory_map_top_down()
+                /* switch to init_level4_pgt */
+                load_cr3(swapper_pg_dir);
 ```
+
+基本这是我已知的页表变化的内容。其他还有部分包括了page的映射和pcpu变量的映射因为很难用图描述，就没有放在本系列当中。
+
+如果后期还有其他有意思的部分，能够说清楚的，将会继续回来更新～
 
 [1]: /kernel_pagetable/01-pagetable_before_decompressed.md
 [2]: /kernel_pagetable/02-pagetable_compiled_in.md
