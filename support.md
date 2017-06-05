@@ -2,10 +2,10 @@ Thanks for your support.
 
 Through Wechat
 
-![wechat](/wechat.jpg)
+![wechat](/wechat.gif)
 
 
 Through Alipay
 
-![Alipay](/alipay.jpg)
+![Alipay](/alipay.gif)
 
