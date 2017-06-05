@@ -35,4 +35,4 @@ Welcome comments and discussion :-)
 
 [1]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/log/?qt=author&q=weiyang%40linux.vnet.ibm.com
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/log/?qt=author&q=richard.weiyang%40gmail.com
-[3]: /support.md
+[3]: support.md
