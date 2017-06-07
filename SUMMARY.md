@@ -1,6 +1,7 @@
 # Summary
 
 * [前言](README.md)
+* [支持](support.md)
 * [老司机带你探索内核编译系统](brief_tutorial_on_kbuild/00_index.md)
     * [编译出你的第一个内核](brief_tutorial_on_kbuild/01_build_your_first_kernel.md)
     * [内核编译中的小目标](brief_tutorial_on_kbuild/02_common_targets_in_kernel.md)
