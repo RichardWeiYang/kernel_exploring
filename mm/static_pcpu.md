@@ -59,6 +59,48 @@ __attribute__((section(".data..percpu")))  \
 
 pcpu变量和普通变量定义时的差别在于pcpu变量被安排在了一个指定的section中。
 
+## 放在哪
+
+已经看到变量定义在某一个section了，但是还是不死心，想要看看究竟是怎么放的。
+
+好吧，我就带你来看看。
+
+首先在[vmlinux.lds.h][1]中定义了PERCPU_INPUT。
+
+```
+#define PERCPU_INPUT(cacheline)				\
+	VMLINUX_SYMBOL(__per_cpu_start) = .;				\
+	*(.data..percpu..first)						\
+	. = ALIGN(PAGE_SIZE);						\
+	*(.data..percpu..page_aligned)					\
+	. = ALIGN(cacheline);						\
+	*(.data..percpu..read_mostly)					\
+	. = ALIGN(cacheline);						\
+	*(.data..percpu)						\
+	*(.data..percpu..shared_aligned)				\
+	VMLINUX_SYMBOL(__per_cpu_end) = .;
+```
+
+你看，凡是.data..percpu开头的都包含在这个定义内了。
+
+在同一个文件中又定义了一个包含这个定义的定义PERCPU_VARRD。
+
+```
+#define PERCPU_VADDR(cacheline, vaddr, phdr)				\
+	VMLINUX_SYMBOL(__per_cpu_load) = .;				\
+	.data..percpu vaddr : AT(VMLINUX_SYMBOL(__per_cpu_load)		\
+				- LOAD_OFFSET) {			\
+		PERCPU_INPUT(cacheline)					\
+	} phdr								\
+	. = VMLINUX_SYMBOL(__per_cpu_load) + SIZEOF(.data..percpu);
+```
+
+而这个PERCPU_VADDR定义最终包含在文件[arch/x86/kernel/vmlinux.lds.S][2]中。
+
+这就是我们最后链接vmlinux时使用的脚本。
+
+再详细就请大家自行看代码～
+
 # 如何访问
 
 定义看完了，来看看要怎么访问。
