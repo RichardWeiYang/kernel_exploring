@@ -166,4 +166,4 @@ __find_buddy_index(unsigned long page_idx, unsigned int order)
 
 
 [1]: http://blog.csdn.net/richardysteven/article/details/52332040
-[2]: http://blog.csdn.net/richardysteven/article/details/68482849
+[2]: /mm/05-Node_Zone_Page.md
