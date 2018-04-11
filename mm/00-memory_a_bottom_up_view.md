@@ -50,9 +50,14 @@ Slub分配器
 
 [传说的伙伴系统][6]
 
+# 参考文献
+
+[Understand Linux VM][7]
+
 [1]: /mm/01-e820_retrieve_memory_from_HW.md
 [2]: /mm/02-memblock.md
 [3]: /mm/03-sparsemem.md
 [4]: /mm/04-numa_node_info.md
 [5]: /mm/05-Node_Zone_Page.md
 [6]: /mm/06-page_alloc.md
+[7]: https://www.kernel.org/doc/gorman/html/understand/index.html
