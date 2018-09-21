@@ -32,3 +32,4 @@
 * [KVM](kvm/00-kvm.md)
     * [内存虚拟化](kvm/01-memory_virtualization.md)
         * [Qemu内存模型](kvm/01_1-qemu_memory_model.md)
+        * [KVM内存管理](kvm/01_2-kvm_memory_manage.md)

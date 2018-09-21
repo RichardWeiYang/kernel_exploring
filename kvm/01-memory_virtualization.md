@@ -8,5 +8,15 @@
 
 就我当前粗陋的理解，下面会从两个方面尝试解读。
 
-* 首先是基于Qemu用户态程序中的内存管理模型
-* 其次是KVM内核模块中内存管理的机制
+* [首先是基于Qemu用户态程序中的内存管理模型][1]
+* [其次是KVM内核模块中内存管理的机制][2]
+
+在查阅资料的过程中也发现了网上不错的内容，其中有更多的代码细节，有兴趣的读者可以进一步学习
+
+* [intel EPT 机制详解][3]
+* [QEMU学习笔记——内存][4]
+
+[1]: /kvm/01_1-qemu_memory_model.md
+[2]: /kvm/01_2-kvm_memory_manage.md
+[3]: http://www.cnblogs.com/ck1020/p/6043054.html
+[4]: https://www.binss.me/blog/qemu-note-of-memory/
