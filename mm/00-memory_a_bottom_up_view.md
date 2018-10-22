@@ -50,9 +50,19 @@ Slub分配器
 
 [传说的伙伴系统][6]
 
+为了加速页的分配和回收，减少多cpu之间对伙伴系统的竞争，内核给每个zone增加了per_cpu_pageset。
+
+[per_cpu_pageset][7]
+
+# slub分配器
+
+页分配以一个页为最小单位，而在系统运行过程中往往不需要这么大的空间。对于这些内存请求，则有slub完成。
+
+[浅说slub][8]
+
 # 参考文献
 
-[Understand Linux VM][7]
+[Understand Linux VM][18]
 
 [1]: /mm/01-e820_retrieve_memory_from_HW.md
 [2]: /mm/02-memblock.md
@@ -60,4 +70,6 @@ Slub分配器
 [4]: /mm/04-numa_node_info.md
 [5]: /mm/05-Node_Zone_Page.md
 [6]: /mm/06-page_alloc.md
-[7]: https://www.kernel.org/doc/gorman/html/understand/index.html
+[7]: /mm/07-per_cpu_pageset.md
+[8]: /mm/08-slub_general.md
+[18]: https://www.kernel.org/doc/gorman/html/understand/index.html
