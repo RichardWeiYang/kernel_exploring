@@ -58,7 +58,8 @@ Slub分配器
 
 页分配以一个页为最小单位，而在系统运行过程中往往不需要这么大的空间。对于这些内存请求，则有slub完成。
 
-[浅说slub][8]
+[slub理念][8]
+[图解slub][9]
 
 # 参考文献
 
@@ -72,4 +73,5 @@ Slub分配器
 [6]: /mm/06-page_alloc.md
 [7]: /mm/07-per_cpu_pageset.md
 [8]: /mm/08-slub_general.md
+[9]: /mm/09-slub_in_graph.md
 [18]: https://www.kernel.org/doc/gorman/html/understand/index.html
