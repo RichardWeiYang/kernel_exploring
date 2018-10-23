@@ -26,6 +26,10 @@ Slub分配器
 
 [寻找页结构体的位置][3]
 
+知道页结构体在那里，顺便来瞥一眼结构体的样子。为啥说是瞥一眼呢？因为这个结构体实在是太大（乱）了。为了满足各种需求，这个结构体中进行了多重复用。先放在这里，作为一个参考文档把。
+
+[眼花的页结构体][10]
+
 所谓的内存物理差异无非就两点：
 
 * 硬件是否能访问
@@ -74,4 +78,5 @@ Slub分配器
 [7]: /mm/07-per_cpu_pageset.md
 [8]: /mm/08-slub_general.md
 [9]: /mm/09-slub_in_graph.md
+[10]: /mm/10-page_struct.md
 [18]: https://www.kernel.org/doc/gorman/html/understand/index.html

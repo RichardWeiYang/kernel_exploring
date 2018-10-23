@@ -25,6 +25,7 @@
     * [e820从硬件获取内存分布](mm/01-e820_retrieve_memory_from_HW.md)
     * [原始内存分配器--memblock](mm/02-memblock.md)
     * [寻找页结构体的位置](mm/03-sparsemem.md)
+    * [眼花的页结构体](mm/10-page_struct.md)
     * [NUMA信息获取](mm/04-numa_node_info.md)
     * [Node-Zone-Page](mm/05-Node_Zone_Page.md)
     * [传说的伙伴系统](mm/06-page_alloc.md)
