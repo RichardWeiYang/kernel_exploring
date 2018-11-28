@@ -34,6 +34,7 @@
     * [图解slub](mm/09-slub_in_graph.md)
     * [挑战和进化](mm/50-challenge_evolution.md)
         * [扩展性的设计和实现](mm/51-scalability_design_implementation.md)
+        * [海量内存](mm/52-hugh_memory.md)
 * [KVM](kvm/00-kvm.md)
     * [内存虚拟化](kvm/01-memory_virtualization.md)
         * [Qemu内存模型](kvm/01_1-qemu_memory_model.md)
