@@ -126,5 +126,40 @@ esac
 
 虽然这么些在理解上增加了一些难度，不过也经过了一些些努力就能水落石出。若能真的理解，就已经做好了kbuild系统探索的基本准备了。
 
+# 一个小tip
+
+阅读代码的时候我喜欢用cscope生成代码之间的索引，而我常用的方法就是make cscope。
+
+但是通常重新生成一遍需要比较长的时间，后来我发现了一个加快生成速度的方法。
+
+> 那就是跳过一些我并不想看的目录。
+
+具体怎么做呢？好了，直接上代码：
+
+```
+diff --git a/scripts/tags.sh b/scripts/tags.sh
+index 4fa070f9231a..5ac0873cfe4d 100755
+--- a/scripts/tags.sh
++++ b/scripts/tags.sh
+@@ -27,6 +27,7 @@ fi
+
+ # ignore userspace tools
+ ignore="$ignore ( -path ${tree}tools ) -prune -o"
++ignore="$ignore ( -path ${tree}drivers/gpu ) -prune -o"
++ignore="$ignore ( -path ${tree}drivers/net ) -prune -o"
++ignore="$ignore ( -path ${tree}drivers/media ) -prune -o"
++ignore="$ignore ( -path ${tree}drivers/scsi ) -prune -o"
++ignore="$ignore ( -path ${tree}drivers/staging ) -prune -o"
++ignore="$ignore ( -path ${tree}drivers/usb ) -prune -o"
++ignore="$ignore ( -path ${tree}drivers/infiniband ) -prune -o"
+
+ # Detect if ALLSOURCE_ARCHS is set. If not, we assume SRCARCH
+ if [ "${ALLSOURCE_ARCHS}" = "" ]; then
+```
+
+主要是去掉了几个大体积驱动的索引。整个制作索引的时间从117s下降到了57s，超过了50%。
+
+希望能帮到你。
+
 [1]: /brief_tutorial_on_kbuild/03_first_target_help.md
 [2]: https://www.gnu.org/software/make/manual/html_node/Call-Function.html
