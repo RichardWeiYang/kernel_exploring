@@ -6,6 +6,11 @@
 
 [从IDT开始][1]
 
+# 中断和异常的区别
 
+中断和异常这两个词我想大家经常听到，但是这两者之间有什么区别呢？你能想到啥？那就听我慢慢道来吧～
+
+[中断？异常？][2]
 
 [1]: /interrupt_exception/01-idt.md
+[2]: /interrupt_exception/02-difference.md
