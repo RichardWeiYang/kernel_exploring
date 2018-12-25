@@ -38,6 +38,7 @@
 * [中断和异常](interrupt_exception/00-start_from_hardware.md)
     * [从IDT开始](interrupt_exception/01-idt.md)
     * [中断？异常？有什么区别](interrupt_exception/02-difference.md)
+    * [系统调用的实现](interrupt_exception/03-syscall.md)
 * [KVM](kvm/00-kvm.md)
     * [内存虚拟化](kvm/01-memory_virtualization.md)
         * [Qemu内存模型](kvm/01_1-qemu_memory_model.md)
