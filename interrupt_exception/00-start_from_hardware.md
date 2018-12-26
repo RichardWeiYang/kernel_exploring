@@ -20,6 +20,15 @@
 
 [系统调用的实现][3]
 
+# 异常处理
+
+书归正传，看过了系统调用，现在继续回来看异常处理。
+
+在这里我们只看看异常向量表是如何初始化，并关联到异常处理函数的。
+
+[异常向量表的设置][4]
+
 [1]: /interrupt_exception/01-idt.md
 [2]: /interrupt_exception/02-difference.md
 [3]: /interrupt_exception/03-syscall.md
+[4]: /interrupt_exception/04-exception_vector_setup.md
