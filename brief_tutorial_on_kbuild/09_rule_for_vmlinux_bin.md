@@ -122,18 +122,18 @@ At last。
 ```
        vmlinux
 
-         ||
+         ||  objcopy
          \/
 
-       boot/compressed/vmlinux.bin
+       arch/x86/boot/compressed/vmlinux.bin
 
 
-         ||
+         ||  gzip
          \/
 
-       boot/compressed/vmlinux.bin.gz
+       arch/x86/boot/compressed/vmlinux.bin.gz
 
-         ||
+         ||  include
          \/
 
        piggy.o       head_$(BITS).o
@@ -142,15 +142,15 @@ At last。
                      error.o
                      cpuflsgs.o
 
-             ||
+             ||  ld
              \/
 
-      boot/compressed/vmlinux
+      arch/x86/boot/compressed/vmlinux
 
-             ||
+             ||  objcopy
              \/
 
-         boot/vmlinux.bin
+         arch/x86/boot/vmlinux.bin
 ```
 
 是不是稍微的清晰了那么一些些？
