@@ -28,7 +28,14 @@
 
 [异常向量表的设置][4]
 
+# 中断函数
+
+最后我们来看看中断。当然我们同样暂时不看很多具体的细节，只是把中断向量表和中断函数串起来。能够对系统架构有一个大致的理解。
+
+[中断向量和中断函数][5]
+
 [1]: /interrupt_exception/01-idt.md
 [2]: /interrupt_exception/02-difference.md
 [3]: /interrupt_exception/03-syscall.md
 [4]: /interrupt_exception/04-exception_vector_setup.md
+[5]: /interrupt_exception/05-interrupt_handler.md
