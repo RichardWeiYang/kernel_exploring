@@ -170,7 +170,7 @@ $(obj)/tools/build $(obj)/setup.bin $(obj)/vmlinux.bin \
 ## 一张图显示依赖关系
 
 ```
-         setup.bin    vmlinux.bin  
+arch/x86/boot/setup.bin  arch/x86/boot/vmlinux.bin  
                \         /
                 \       /
                  bzImage
