@@ -41,6 +41,7 @@
     * [系统调用的实现](interrupt_exception/03-syscall.md)
     * [异常向量表的设置](interrupt_exception/04-exception_vector_setup.md)
     * [中断向量和中断函数](interrupt_exception/05-interrupt_handler.md)
+* [设备模型](bus_driver_device/00-device_model.md)
 * [KVM](kvm/00-kvm.md)
     * [内存虚拟化](kvm/01-memory_virtualization.md)
         * [Qemu内存模型](kvm/01_1-qemu_memory_model.md)
