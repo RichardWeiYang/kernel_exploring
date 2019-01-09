@@ -12,4 +12,20 @@
 
 [总线][1]
 
+# 驱动
+
+驱动和设备部分前后，先聊聊驱动。
+
+[驱动][2]
+
+# 设备
+
+终于要看到设备了。
+
+[设备][3]
+
+
+
 [1]: /bus_driver_device/01-bus.md
+[2]: /bus_driver_device/02-driver.md
+[3]: /bus_driver_device/03-device.md
