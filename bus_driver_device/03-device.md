@@ -50,17 +50,23 @@
 # 总线，驱动和设备的树
 
 ```
-           bus(bus_kset)                          devices(devices_kset)
-                |                                        |
-  --+-----------+------+-----                   ----+----+-------------
-    |                  |                            |
-    +- drivers         +- devices                   |
-       |                  |                         |
-       +- drvA   <- - -   +- devA   - * - * -  >    +- devA
-       |                  |                         |  
-       +- drvB   <- - -   +- devB   - * - * -  >    +- devB
-       |                  |                         |  
-       +- drvC   <- - -   +- devC   - * - * -  >    +- devC
+           bus(bus_kset)      <-------------+     devices(devices_kset)
+                |                           |            |
+  --+-----------+------+-----               |   ----+----+-------------
+    |                  |                    |       |
+    +- drivers         +- devices           |       |
+       |                  |                 |       |
+       +- drvA   <- - -   +- devA   - * - * |  >    +- devA
+       |                  |  |              |       |  
+       |                  |  +- subsystem --+       |  
+       |                  |                 |       |  
+       +- drvB   <- - -   +- devB   - * - * |  >    +- devB
+       |                  |  |              |       |  
+       |                  |  +- subsystem --+       |  
+       |                  |                 |       |  
+       +- drvC   <- - -   +- devC   - * - * |  >    +- devC
+       |                  |  |              |       |  
+       |                  |  +- subsystem --+       |  
        |                  |                         |  
        +- drvD   <- - -   +- devD   - * - * -  >    +- devD
 ```
