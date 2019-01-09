@@ -24,8 +24,13 @@
 
 [设备][3]
 
+# 如何关联设备和驱动
 
+在上面小节的描述中，我们跳过了一个非常总要的环节，那就是驱动和设备是如何关联到一起的。
+
+[绑定][4]
 
 [1]: /bus_driver_device/01-bus.md
 [2]: /bus_driver_device/02-driver.md
 [3]: /bus_driver_device/03-device.md
+[4]: /bus_driver_device/04-bind.md
