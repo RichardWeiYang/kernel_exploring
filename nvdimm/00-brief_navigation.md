@@ -14,5 +14,12 @@
 
 [nvdimm_bus][2]
 
+# nvdimm
+
+在整个设备树中，有一个孤零零的存在:nvdimm。这就是是用来表示物理dimm设备的。
+
+[nvdimm][3]
+
 [1]: /nvdimm/01-a_big_picture.md
 [2]: /nvdimm/02-nvdimm_bus.md
+[3]: /nvdimm/03-nvdimm.md
