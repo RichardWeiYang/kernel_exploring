@@ -50,6 +50,7 @@
     * [上帝视角](nvdimm/01-a_big_picture.md)
     * [nvdimm_bus](nvdimm/02-nvdimm_bus.md)
     * [nvdimm](nvdimm/03-nvdimm.md)
+    * [nd_region](nvdimm/04-nd_region.md)
 * [KVM](kvm/00-kvm.md)
     * [内存虚拟化](kvm/01-memory_virtualization.md)
         * [Qemu内存模型](kvm/01_1-qemu_memory_model.md)

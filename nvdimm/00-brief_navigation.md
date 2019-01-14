@@ -20,6 +20,13 @@
 
 [nvdimm][3]
 
+# nd_region
+
+接着我们就来看nvdimm_bus下，另一个子树。而这颗子树的根就是nd_region了。
+
+[nd_region][4]
+
 [1]: /nvdimm/01-a_big_picture.md
 [2]: /nvdimm/02-nvdimm_bus.md
 [3]: /nvdimm/03-nvdimm.md
+[4]: /nvdimm/04-nd_region.md
