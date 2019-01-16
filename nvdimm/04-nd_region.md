@@ -197,6 +197,36 @@ acpi_nfit_register_regions()
     +-----+-------------------------------------------+  
 ```
 
+补充一点，nd_regioin一共有三种类型:
+
+  * nd_pmem
+  * nd_volatile
+  * nd_blk
+
+这个类型的区分由dev->type的值来区分，对应上面三种类型各自的type值为：
+
+  * nd_pmem_device_type
+  * nd_volatile_device_type
+  * nd_blk_device_type
+
+到这里基本算可以结束了，但是我还想再往回推一层。那就是这个type的值是谁来决定的。
+
+在本节的开头我们也看到了，每个nd_region是在acpi_nfit_desc->spa的基础上创建的。而在代码中也正好印证了这一点。nd_region->type也是基于spa的类型决定的。
+
+```
+int nfit_spa_type(struct acpi_nfit_system_address *spa)
+{
+	int i;
+
+	for (i = 0; i < NFIT_UUID_MAX; i++)
+		if (guid_equal(to_nfit_uuid(i), (guid_t *)&spa->range_guid))
+			return i;
+	return -1;
+}
+```
+
+这个函数将spa->range_guid和一个表比较，从而得出当前spa的类型，也就是nd_region的类型了。
+
 ## nd_region_driver
 
 当一个nd_region构造好了之后，其对应的驱动就该登场干活了。这次就是nd_region_driver，而且还干了不少活。
