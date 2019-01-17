@@ -32,8 +32,19 @@
 
 [nd_region][4]
 
+而在nd_region下，有四个并列的设备：
+
+  * [nd_namespace][6]
+  * [btt][7]
+  * [dax][8]
+  * [pfn][9]
+
 [1]: /nvdimm/01-a_big_picture.md
 [2]: /nvdimm/02-nvdimm_bus.md
 [3]: /nvdimm/03-nvdimm.md
 [4]: /nvdimm/04-nd_region.md
 [5]: /nvdimm/00-brief_user_guide.md
+[6]: /nvdimm/05-namespace.md
+[7]: /nvdimm/06-btt.md
+[8]: /nvdimm/07-dax.md
+[9]: /nvdimm/08-pfn.md
