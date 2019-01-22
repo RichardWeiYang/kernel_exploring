@@ -34,7 +34,7 @@
 
 而在nd_region下，有四个并列的设备：
 
-  * [nd_namespace][6]
+  * [nd_namespace_X][6]
   * [btt][7]
   * [pfn][9]
   * [dax][8]
