@@ -36,8 +36,8 @@
 
   * [nd_namespace][6]
   * [btt][7]
-  * [dax][8]
   * [pfn][9]
+  * [dax][8]
 
 [1]: /nvdimm/01-a_big_picture.md
 [2]: /nvdimm/02-nvdimm_bus.md

@@ -213,7 +213,13 @@ pmem最后整合了一个resource。我猜这个res表示的范围就是内存�
 经过仔细研读和实验验证，结果发现了几个神奇的事儿。
 
   * nd_pmem_driver不仅仅是namespace的驱动，还是btt/pfn设备的驱动。
-  * nd_region_probe()会建立btt/pfn/dax设备。
+  * nd_region_probe()会也建立btt/pfn/dax设备。
   * nd_pmem_probe也会通过nd_btt/pfn/dax_probe建立对应的设备。
 
-好吧，我不知道驱动的作者是怎么想的。而且在nd_pmem_probe建立的设备才是真的有信息的。
+关于这个过程的具体细节可以看[lkml][1]中的这个讨论，或许可以让逻辑清楚一点。
+
+总之当namespace被配置成这三种类型的某一种时，nd_pmem_probe会通过nd_btt/pfn/dax_probe去创建某一种类型的设备。并且有意思的是，这种情况下nd_pmem_probe会**失败**。这种高端的方法我还是头一次见。
+
+接下来的事情就交给了各自的设备和驱动了。
+
+[1]: https://lkml.org/lkml/2019/1/18/1026
