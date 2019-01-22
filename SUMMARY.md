@@ -53,6 +53,7 @@
     * [nvdimm](nvdimm/03-nvdimm.md)
     * [nd_region](nvdimm/04-nd_region.md)
     * [nd_namespace_X](nvdimm/05-namespace.md)
+    * [nd_dax](nvdimm/07-dax.md)
 * [KVM](kvm/00-kvm.md)
     * [内存虚拟化](kvm/01-memory_virtualization.md)
         * [Qemu内存模型](kvm/01_1-qemu_memory_model.md)
