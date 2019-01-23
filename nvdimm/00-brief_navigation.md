@@ -39,6 +39,12 @@
   * [nd_pfn][9]
   * [nd_dax][8]
 
+# dev_dax
+
+在着重描述了namespace和nd_dax后，终于要到整个驱动的最后也就是[dev_dax][10]。
+
+这是用户使用nd_dax设备的接口。
+
 [1]: /nvdimm/01-a_big_picture.md
 [2]: /nvdimm/02-nvdimm_bus.md
 [3]: /nvdimm/03-nvdimm.md
@@ -48,3 +54,4 @@
 [7]: /nvdimm/06-btt.md
 [8]: /nvdimm/07-dax.md
 [9]: /nvdimm/08-pfn.md
+[10]: /nvdimm/09-dev_dax.md
