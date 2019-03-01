@@ -30,12 +30,19 @@
 
 # 中断函数
 
-最后我们来看看中断。当然我们同样暂时不看很多具体的细节，只是把中断向量表和中断函数串起来。能够对系统架构有一个大致的理解。
+接着我们来看看中断。当然我们同样暂时不看很多具体的细节，只是把中断向量表和中断函数串起来。能够对系统架构有一个大致的理解。
 
 [中断向量和中断函数][5]
+
+# APIC
+
+随着硬件的进步，中断控制器也从原始的8259A进化到了APCI。在这里我们也粗略的了解一下。
+
+[APIC][6]
 
 [1]: /interrupt_exception/01-idt.md
 [2]: /interrupt_exception/02-difference.md
 [3]: /interrupt_exception/03-syscall.md
 [4]: /interrupt_exception/04-exception_vector_setup.md
 [5]: /interrupt_exception/05-interrupt_handler.md
+[6]: /interrupt_exception/06-apic.md
