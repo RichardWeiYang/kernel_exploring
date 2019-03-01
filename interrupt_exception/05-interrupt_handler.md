@@ -211,21 +211,21 @@ for_each_action_of_desc(desc, action) {
 # 粗略的一张图
 
 ```
-    IDT (idt_table)                struct irq_desc                                struct irqaction      struct irqaction
-    +-----------+        +-----------------------------------------+    +----------------+    +----------------+
-    |           |        |action (struct irqaction*)        next --|--->|         next --|--->|         next --| -> NULL
-    +-----------+        |                                         |    |                |    |                |
-    |           |        |                    +--> handler         |    | +->handler     |    | +->handler     |
-    +-----------+        +--------------------|--------------------+    +-|--------------+    +-|--------------+
-    .           .   +--->|handle_irq()        +----------------+---+------+---------------------+
-    .           .   |    |= handle_level_irq                   |   |
-    .           .   |    |= handle_edge_irq                    |   |
-    +-----------+   |    |= handle_edge_eoi_irq                |   |
-    |           |   |    |= handle_percpu_irq                  |   |
-    +-----------+   |    |  |                                  |   |
-    |do_IRQ  ---|---+    |  +->  __handle_irq_event_percpu() --+   |
-    +-----------+        |                                         |
-    |           |        +-----------------------------------------+
+    IDT (idt_table)      struct irq_desc                                struct irqaction      struct irqaction
+    +-----------+        +-------------------------------------+    +----------------+    +----------------+
+    |           |        |action (struct irqaction*)         --|--->|         next --|--->|         next --| -> NULL
+    +-----------+        |                                     |    |                |    |                |
+    |           |        |                                     |    | +->handler     |    | +->handler     |
+    +-----------+        +-------------------------------------+    +-|--------------+    +-|--------------+
+    .           .   +--->|handle_irq()                         |      +---------------------+
+    .           .   |    |= handle_level_irq                   |      |
+    .           .   |    |= handle_edge_irq                    |      |
+    +-----------+   |    |= handle_edge_eoi_irq                |      |
+    |           |   |    |= handle_percpu_irq                  |      |
+    +-----------+   |    |  |                                  |      |
+    |do_IRQ  ---|---+    |  +->  __handle_irq_event_percpu() --|------+
+    +-----------+        |                                     |
+    |           |        +-------------------------------------+
     +-----------+        
     .           .        
     .           .        
