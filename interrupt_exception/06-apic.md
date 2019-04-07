@@ -109,3 +109,10 @@ start_kernel()
 ```
 
 到这里，我想你也已经清楚了～
+
+# x2APIC
+
+x2APIC是xAPIC对应的扩展，理论上这两者之间应该有不少区别。在这里先记录一点：两者的访问方式不同。
+
+* xAPIC通过MMIO访问APCI的寄存器
+* x2APIC则是通过MSR来访问的
