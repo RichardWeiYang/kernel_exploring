@@ -64,6 +64,12 @@ Shell> ApachePassCli.efi create –goal PersistentMemoryType=AppDirect
 
 从这个命令中可以看出，Region可以有两种模式: Memory 和 PersistentMemory。
 
+补充一下在linux系统中划分region的命令：
+
+```
+ixpdimm-cli create -goal PersistentMemoryType=AppDirect
+```
+
 # Namespace
 
 有了Region后，可以在Region中再建立Namespace。建立了Namespace之后，就可以使用nvdimm了。
@@ -108,4 +114,10 @@ Shell> ApachePassCli.efi create –goal PersistentMemoryType=AppDirect
   },
   "numa_node":0
 }
+```
+
+## 销毁namespace
+
+```
+ndctl delete-namespace -f namespace0.0
 ```
