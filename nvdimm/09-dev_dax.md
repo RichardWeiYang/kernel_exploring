@@ -127,6 +127,40 @@ dax_pmem_probe()
   * 最终的目标是生成dev_dax设备，该设备对应一个字符类型的文件/dev/dax0.0
   * /dev/dax0.0的fops是dax_fops，所以后面的mmap就靠它了
   * dev_dax生成的信息在dax_region中
-  * dax_region中res就是对齐过后，去掉元数据的部分； 
+  * dax_region中res就是对齐过后，去掉元数据的部分；
 
 怎么样，这下是不是够爽？
+
+# device_dax_driver
+
+再来回顾一下dev_dax结构体中新创建的设备。
+
+```
+    dev                                                                 
+    (struct device)                                                  
+    +---------------------------------+                              
+    |devt                             |  dax_dev.inode->i_rdev       
+    |class                            |  dax_class                   
+    |/ bus                            |  dax_bus_type                
+    |groups                           |  dax_attribute_groups        
+    |parent                           |  dax_region->dev = nd_pfn    
+    |                                 |                              
+    |kobj->name                       |  = "dax0.0"                  
+    +---------------------------------+                              
+```
+
+这部分已经超出了nvdimm驱动的范畴，但是为了把故事讲完，我们还是要看一下生成的这个设备是如何被使用到的。
+
+因为这个设备是在dax_bus_type总线上的，所以它的驱动也应该是在同一个总线上的了。这个默认的驱动就是device_dax_driver.
+
+```
+static struct dax_device_driver device_dax_driver = {
+	.drv = {
+		.probe = dev_dax_probe,
+		.remove = dev_dax_remove,
+	},
+	.match_always = 1,
+};
+```
+
+在这个probe函数中，关键的一点就是设置了对应字符设备的ops -> dax_fops。
