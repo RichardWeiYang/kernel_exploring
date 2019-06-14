@@ -7,12 +7,25 @@
 ```
 dax_pmem_probe()
   nvdimm_setup_pfn(nd_pfn, &pgmap);
+    nd_pfn_init(nd_pfn);
+    __nvdimm_setup_pfn(nd_pfn, pgmap);
   dax_region = alloc_dax_region(dev, region_id, &res,
     le32_to_cpu(pfn_sb->align), addr, PFN_DEV|PFN_MAP);
   dev_dax = __devm_create_dev_dax(dax_region, id, &pgmap, subsys);
+    dax_dev = alloc_dax(dev_dax, NULL, NULL);
+      dax_dev = dax_dev_get(devt);
+        ...
+        alloc_inode(super_block)
+    dev_dax->dax_dev = dax_dev;
 ```
 
-所以这里一共涉及了三个数据结构，我们来看看他们的样子和关系。
+上面的流程就是从nd_dax/nd_pfn设备构造到dev_dax的过程。大致可以分成三个步骤：
+
+  * nvdimm_setup_pfn() 对nd_pfn中的成员做了设置，比如对齐和计算page struct的空间
+  * alloc_dax_region() 这是构造dev_dax所需的信息
+  * 函数__devm_create_dev_dax用来创建dax_dev，也就是dax文件系统。值得注意的是这个数据结构是通过super_block创建inode时候创建的。
+
+dev_dax是个庞大的结构体，就让我们来看一看吧。
 
 # dev_dax, dax_dev, dax_region
 
@@ -131,9 +144,9 @@ dax_pmem_probe()
 
 怎么样，这下是不是够爽？
 
-# device_dax_driver
+# dev_dax的驱动device_dax_driver
 
-再来回顾一下dev_dax结构体中新创建的设备。
+既然有了dev_dax，那么这个设备是如何开始它的工作的呢？再来回顾一下dev_dax结构体中新创建的设备。
 
 ```
     dev                                                                 
@@ -163,4 +176,9 @@ static struct dax_device_driver device_dax_driver = {
 };
 ```
 
-在这个probe函数中，关键的一点就是设置了对应字符设备的ops -> dax_fops。
+## 探测
+
+这个驱动的探测函数dev_dax_probe主要做了两件事情：
+
+  * devm_memremap_pages(dev, &dev->pgmap)
+  * cdev_init(cdev, &dax_fops);
