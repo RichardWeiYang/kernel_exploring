@@ -176,4 +176,27 @@ SPARSEMEM提出了一个新的概念
 
 好了，这个SPARSEMEM就讲到这里～我想大家已经知道page结构体是在什么地方的了～
 
+# 全局顺序
+
+最后来看一下启动时sparsemem代码执行顺序。
+
+```
+start_kernel()
+		setup_arch()
+				e820__memblock_setup()
+				init_mem_mapping()
+				initmem_init()
+				x86_init.paging.pagetable_init() -> paging_init()
+						sparse_memory_present_with_active_regions(MAX_NUMNODES);
+								memory_present()            mark present in mem_section
+						sparse_init()
+								sparse_init_nid()           setup memmap/usermap
+						zone_sizes_init()               init pgdat
+```
+
+简单来说分了两步：
+
+* 标注哪些section是存在的
+* 给存在的section分配memmap/usermap
+
 [1]: https://lwn.net/Articles/134804/
