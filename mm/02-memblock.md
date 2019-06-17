@@ -77,12 +77,22 @@ memblock的重要作用就是内核初期的内存分配器了。那通过memblo
 
 之前我们已经看过，内存的信息通过e820从硬件中获取保存在了相应的结构体中。那现在的问题就是memblock是怎么对应上实际的物理内存的呢？
 
-在x86平台，这个工作就交给了memblock_x86_fill()。
-
-PS: 在最新的代码4.11版本中改成了e820__memblock_setup()。
+全局流程如下：
 
 ```
-void __init memblock_x86_fill(void)
+start_kernel()
+    setup_arch()
+        e820__memory_setup()
+        memblock_set_current_limit()
+        e820__memblock_setup()
+            memblock_add()
+            memblock_dump_all()
+```
+
+在x86平台，这个工作就交给了 e820__memblock_setup()，从e820信息中构建了memblock。
+
+```
+void __init e820__memblock_setup(void)
 {
     int i;
     u64 end;
