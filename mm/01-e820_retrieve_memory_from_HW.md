@@ -185,9 +185,12 @@ char *__init default_machine_specific_memory_setup(void)
     /* store and sort e820 table to kernel area */
     start_kernel()
           setup_arch()
-               setup_memory_map(),
-                     default_machine_specific_memory_setup(), store and sort e820 table
-                     e820_print_map()
+               e820__memory_setup(),
+                     x86_init.resources.memory_setup() -> e820__memory_setup_default(), store and sort e820 table
+                     e820__print_table()
+               e820__reserve_setup_data();
+               e820__finish_early_params();
+               e820_add_kernel_range();
 ```
 
 最后的这个e820_print_map()函数就是打印出我们使用 "dmesg | grep e820"抓取到的信息的函数了。
