@@ -181,17 +181,17 @@ SPARSEMEM提出了一个新的概念
 最后来看一下启动时sparsemem代码执行顺序。
 
 ```
-start_kernel()
-		setup_arch()
-				e820__memblock_setup()
-				init_mem_mapping()
-				initmem_init()
-				x86_init.paging.pagetable_init() -> paging_init()
-						sparse_memory_present_with_active_regions(MAX_NUMNODES);
-								memory_present()            mark present in mem_section
-						sparse_init()
-								sparse_init_nid()           setup memmap/usermap
-						zone_sizes_init()               init pgdat
+    start_kernel()
+        setup_arch()
+            e820__memblock_setup()
+            init_mem_mapping()
+            initmem_init()
+            x86_init.paging.pagetable_init() -> paging_init()
+                sparse_memory_present_with_active_regions(MAX_NUMNODES);
+                    memory_present()                   mark section present
+                sparse_init()
+                    sparse_init_nid()                  setup section's memmap/usermap
+                zone_sizes_init()                      init pgdat
 ```
 
 简单来说分了两步：
