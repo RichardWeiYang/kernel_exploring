@@ -18,7 +18,10 @@ memblock作为系统启动初期的内存管理系统，在系统启动后就显
     start_kernel()
         mm_init()
             mem_init()
-                free_all_bootmem()
+                memblock_free_all()
+                    free_low_memory_core_early()
+                        ...
+                        __free_pages_core()
 ```
 
 在这个过程中你可以看到熟悉的for_each_free_mem_range()。对了，这就是遍历memory_block的内存信息，来填充page结构体的过程了。
