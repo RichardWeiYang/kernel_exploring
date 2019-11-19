@@ -208,6 +208,29 @@ __find_buddy_index(unsigned long page_idx, unsigned int order)
     HUGETLB_PAGE_DTOR
     TRANSHUGE_PAGE_DTOR
 
+# page->_refcount
+
+这个值用来表示有多少人在使用这个page，当page在buddy分配器中_refcount为0。
+
+```
+memmap_init()
+    memmap_init_zone()
+        init_page_count()
+            set_page_count(page, 1)    <--- set to 1
+
+mem_init()
+    memblock_free_all()
+        free_low_memory_core_early()
+            __free_memory_core()
+                ...
+                __free_pages_core()
+                    set_page_refcounted()   <--- set to 1 again
+                    __free_pages()
+```
+
+之后有新的使用者，一般会用get_page来表示，防止错误释放页面。
+
+同样在put_page中，就会检查_refcount是不是为零。如果减到零，就会把页面归还给buddy分配器。
 
 [1]: http://blog.csdn.net/richardysteven/article/details/52332040
 [2]: /mm/05-Node_Zone_Page.md
