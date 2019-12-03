@@ -208,7 +208,18 @@ __find_buddy_index(unsigned long page_idx, unsigned int order)
     HUGETLB_PAGE_DTOR
     TRANSHUGE_PAGE_DTOR
 
-# page->_refcount
+# 引用计数
+
+随着伙伴系统越来越复杂，就会需要一些辅助信息来帮助管理。比如记录当前页面有多少使用者。在页结构体中有两个重要的引用计数：
+
+  * _refcount
+  * _mapcount
+
+前者用来记录该页面当前的使用者个数，而后者标示当前页面映射到页表的次数。
+
+而且在内核中如果前者的数目大于后者，则称这个页面“pin”住了。
+
+## page->_refcount
 
 这个值用来表示有多少人在使用这个page，当page在buddy分配器中_refcount为0。
 
@@ -232,5 +243,29 @@ mem_init()
 
 同样在put_page中，就会检查_refcount是不是为零。如果减到零，就会把页面归还给buddy分配器。
 
+值得注意的是如果是compound page那么这个引用计数会加在head page上。
+
+## page->_mapcount
+
+用来表示映射到用户空间的次数。从-1开始。所以在分配页面时需要确认这点。
+
+```
+check_new_page()
+  if (unlikely(atomic_read(&page->_mapcount) != -1))
+    return false;
+```
+
+不过要获得一个页面被映射到进程的次数，就稍微复杂了点。这里涉及到了两个函数：
+
+  * page_mapcount
+  * total_mapcount
+
+其中page_mapcount是针对一个PTE page来看的。
+而total_mapcount则是针对一个THP来看的。
+
+里面的原因在[THP和mapcount之间的恩恩怨怨][3]一文中做了详细的阐述。
+
+
 [1]: http://blog.csdn.net/richardysteven/article/details/52332040
 [2]: /mm/05-Node_Zone_Page.md
+[3]: /virtual_mm/02-thp_mapcount.md
