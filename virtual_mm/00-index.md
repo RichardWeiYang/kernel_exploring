@@ -14,6 +14,7 @@
   * 页表
   * vma
   * 反向映射
+  * THP
 
 # 页表
 
@@ -31,7 +32,14 @@
 
 从概念上看这个值的含义是表示当前页映射到页表的个数，案例是比较好理解的。但是当这个数遇到了透明大页(THP)后就产生了各种纠缠不清的恩恩怨怨。在[THP和mapcount之间的恩恩怨怨][3]文章中，我将给大家尝试理清楚这中间的是是非非。
 
+# THP
+
+透明大页(THP)是一种能够加速页表查询的方法。很有意思，在这里简要说一下我的理解。
+
+[透明大页的玄机][5]
+
 [1]: /mm/00-memory_a_bottom_up_view.md
 [2]: /virtual_mm/01-anon_rmap_history.md
 [3]: /virtual_mm/02-thp_mapcount.md
 [4]: /virtual_mm/03-page_table_fault.md
+[5]: /virtual_mm/04-thp.md
