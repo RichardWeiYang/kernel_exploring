@@ -22,5 +22,12 @@
 
 [海量内存][2]
 
+# 内存热插拔
+
+最近有review了相关的patch，发现自己之前竟然没有总结这一块。看来看去不知道放在哪里，就先放在这里吧～
+
+[内存热插拔][3]
+
 [1]: /mm/51-scalability_design_implementation.md
 [2]: /mm/52-hugh_memory.md
+[3]: /mm/53-memory_hotplug.md
