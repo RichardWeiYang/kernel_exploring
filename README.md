@@ -23,7 +23,9 @@ Here are the patches merged in kernel:
 
 [2011-2016][1]
 
-[2016-][2]
+[2016-2019][2]
+
+[2019-][4]
 
 ##  Support
 
@@ -36,3 +38,4 @@ Welcome comments and discussion :-)
 [1]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/log/?qt=author&q=weiyang%40linux.vnet.ibm.com
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/log/?qt=author&q=richard.weiyang%40gmail.com
 [3]: support.md
+[4]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/log/?qt=author&q=richardw.yang%40linux.intel.com
