@@ -161,3 +161,29 @@ do_huge_pmd_anonymous_page
 
 alloc_hugepage_direct_gfpmask返回的gfp都包含了__GFP_COMP。这一点保证了得到的页一定是compound page。
 prep_transhuge_page中设置了compound_dtor。个人感觉用这个来做判断更加准确。
+
+# PageSwapCache
+
+有几个地方设置，其中之一在函数add_to_swap_cache()中。
+
+```
+  shrink_page_list
+    add_to_swap(page)
+      add_to_swap_cache(page, entry, gfp)
+        SetPageSwapCache(page)
+```
+
+感觉这条线还是从kswapd下来的。
+
+# PageSwapBacked
+
+这个也有几个地方可以设置，其中一个在缺页中断的do_swap_page()。
+
+```
+  handle_pte_fault
+    if (!pte_present(vmf->orig_pte))
+      return do_swap_page(vmf);
+        __SetPageSwapBacked(page)
+```
+
+感觉意思是发生缺页中断，如果这个页有在swap中了，那就标记这个位。
