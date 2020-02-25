@@ -69,3 +69,7 @@
     * [内存虚拟化](kvm/01-memory_virtualization.md)
         * [Qemu内存模型](kvm/01_1-qemu_memory_model.md)
         * [KVM内存管理](kvm/01_2-kvm_memory_manage.md)
+* [内核中的数据结构](data_struct/00-index.md)
+    * [双链表](data_struct/01-list.md)
+    * [哈希表](data_struct/02-hlist.md)
+    * [优先级队列](data_struct/03-plist.md)
