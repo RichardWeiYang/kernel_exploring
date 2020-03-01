@@ -44,6 +44,7 @@
   * [匿名反向映射的前世今生](virtual_mm/01-anon_rmap_history.md)
   * [THP和mapcount之间的恩恩怨怨](virtual_mm/02-thp_mapcount.md)
   * [透明大页的玄机](virtual_mm/04-thp.md)
+* [内存的回收再利用](mm_reclaim/00-index.md)
 * [中断和异常](interrupt_exception/00-start_from_hardware.md)
     * [从IDT开始](interrupt_exception/01-idt.md)
     * [中断？异常？有什么区别](interrupt_exception/02-difference.md)
