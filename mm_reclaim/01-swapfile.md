@@ -152,3 +152,71 @@ sudo swapon myswap
 这里因为是一个swapfile，所以对应的a_ops就是swap_aops。在函数init_swap_address_space()中初始化。
 
 到这里基本算是了解了swap分区的基本工作流程，当然还有更多细节有待挖掘。
+
+# 演进
+
+基本概念差不多是上面描述的样子了，接下来我们看看更加具体的细节。而这些细节大多是一步步演进过来的。
+
+## swap_count
+
+在“找到空闲的swap空间”这部分，我们可以看到swap_map这个数组用来保存对应页面的状态信息。包括了：
+
+* 被映射的数目
+* 是否有cache
+* 是不是坏的
+
+这这一小节我们主要来看swap_count是如何存储**被映射的数目**的。
+
+在 commit 570a335b8e22 swap_info: swap count continuations中，引入了采用链式的存储数目的方法。这样呢就导致了swap_map这个字节有了两种格式：
+
+```
+    First swap_map:
+
+        COUNT_CONTINUED
+         |    SWAP_HAS_CACHE
+         |     |
+         v     v
+       +----+----+----+----+----+----+----+----+
+       |    |    |    |    |    |    |    |    |
+       +----+----+----+----+----+----+----+----+
+
+    Continuations:
+
+        COUNT_CONTINUED
+         |
+         |
+         v
+       +----+----+----+----+----+----+----+----+
+       |    |    |    |    |    |    |    |    |
+       +----+----+----+----+----+----+----+----+
+```
+
+总的来说，也就是第一个swap_map的格式和后续的会不一样。差别主要是第一个字节中的SWAP_HAS_CACHE被占用来表达了一个特殊含义，而后续的swap_map可以有7个bit来表达数目信息。
+而每个swap_map的最高位COUNT_CONTINUED用来表示后续是否还有更高位的信息。
+
+这样一来 后续swap_map能表达的数目信息由低7位表达，也就是     SWAP_CONT_MAX   0x7f(0111 1111)。
+但是呢，第一个swap_map能表达的数目信息却不是低6位的全部，而是 SWAP_MAP_MAX    0x3e(0011 1110)。因为SWAP_MAP_BAD    0x3f(0011 1111)用来表达一个特殊含义。
+
+所以这些定义确实有点让人需要花一些时间去理解。我把这些特殊的定义稍微总结一下：
+
+```
+Bit indication in first swap_map:
+
+   SWAP_HAS_CACHE  0x40(0100 0000)
+
+Bit indication in all swap_map(?):
+
+   COUNT_CONTINUED 0x80(1000 0000)
+
+Special value in first swap_map:
+
+   SWAP_MAP_MAX    0x3e(0011 1110)
+   SWAP_MAP_BAD    0x3f(0011 1111)
+   SWAP_MAP_SHMEM  0xbf(1011 1111)
+
+Special value in swap_map continuation:
+
+   SWAP_CONT_MAX   0x7f(0111 1111)
+```
+
+其实呢，了解了数据结构，就基本能理解后续代码是如何运作的了。这部分主要的函数是swap_count_continued()，这个函数相当于一个对于swap_map的加减法。而函数add_swap_count_continuation()则是在需要的时候扩展相对应的计数空间。当然里面用的招数是链接page->lru，有点高难度了。
