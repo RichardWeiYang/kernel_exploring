@@ -31,6 +31,7 @@
     * [NUMA信息获取](mm/04-numa_node_info.md)
     * [Node-Zone-Page](mm/05-Node_Zone_Page.md)
     * [传说的伙伴系统](mm/06-page_alloc.md)
+    * [指定node/zone](mm/12-specify_zone_node.md)
     * [per_cpu_pageset](mm/07-per_cpu_pageset.md)
     * [slub的理念](mm/08-slub_general.md)
     * [图解slub](mm/09-slub_in_graph.md)
