@@ -57,3 +57,52 @@
 可以看到这三个水线之间的距离是相同的，而这个距离则是当前zone内存容量的一个比例。默认这个比例是0.1%。
 
 好了，是不是挺简单的了。
+
+# lowmem_reserve
+
+除了水线，还有一个概念控制着什么时候进行内存回收 -- lowmem_reserve。准确的来说应该是这是水线的组成部分。
+
+在判断水线的函数__zone_watermark_ok()中，我们可以看到这么一个判断：
+
+```
+    /*
+     * Check watermarks for an order-0 allocation request. If these
+     * are not met, then a high-order request also cannot go ahead
+     * even if a suitable page happened to be free.
+     */
+    if (free_pages <= min + z->lowmem_reserve[classzone_idx])
+      return false;
+```
+
+也就是空闲页需要大于 水线(min) + lowmem_reserve[]才能算是水线达标。那么我们就来看看这个lowmem_reserve是怎么计算的吧。
+
+setup_per_zone_lowmem_reserve()是设置lowmem_reserve[]的函数，让我们用一张图来展示一下这个概念：
+
+```
+        Zone[0]       Zone[1]      Zone[2]      Zone[3]
+        +-------------+-------------+------------+------------+
+  ls[3] |mp[3] + mp[2]|mp[3] + mp[2]|mp[3]       |     0      |
+        |+ mp[1] /    |   /         |   /        |            |
+        |ra[0]        |ra[1]        |ra[2]       |            |
+        +-------------+-------------+------------+------------+
+  ls[2] |mp[2] + mp[1]|mp[2]        |     0      |   N/A      |
+        |   /         |   /         |            |            |
+        |ra[0]        |ra[1]        |            |            |
+        +-------------+-------------+------------+------------+
+  ls[1] |mp[1]        |     0       |   N/A      |   N/A      |
+        |   /         |             |            |            |
+        |ra[0]        |             |            |            |
+        +-------------+-------------+------------+------------+
+  ls[0] |     0       |   N/A       |   N/A      |   N/A      |
+        |             |             |            |            |
+        |             |             |            |            |
+        +-------------+-------------+------------+------------+
+```
+
+其中采用的缩写标示为：
+
+* mp[i]: managed pages of zone[i]
+* ra[i]: sysctl_lowmem_reserve_ratio[i]
+* ls[i]: lowmem_reserve[i]
+
+这么看来 zone.lowmem_reserve[i]的含义是**如果要在zone上分配 zone[i]的内存，而此时zone上的内存小于zone.lowmem_reserve[i] + watermark，那么这个分配将出发回收动作。**.
