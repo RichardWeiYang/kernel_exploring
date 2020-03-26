@@ -56,7 +56,7 @@ Slub分配器
 
 将内存划分为node/zone之后，分配内存时是不是有办法去控制从哪个node哪个zone上去分配呢？答案是有的。
 
-[指定node/zone][20]
+[GFP的功效][20]
 
 为了加速页的分配和回收，减少多cpu之间对伙伴系统的竞争，内核给每个zone增加了per_cpu_pageset。
 
@@ -103,4 +103,4 @@ Slub分配器
 [11]: /mm/50-challenge_evolution.md
 [18]: https://www.kernel.org/doc/gorman/html/understand/index.html
 [19]: /mm/11-users_of_buddy.md
-[20]: /mm/12-specify_zone_node.md
+[20]: /mm/12-gfp_usage.md
