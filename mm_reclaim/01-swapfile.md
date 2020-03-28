@@ -153,9 +153,9 @@ sudo swapon myswap
 
 到这里基本算是了解了swap分区的基本工作流程，当然还有更多细节有待挖掘。
 
-# 演进
+# 基本概念
 
-基本概念差不多是上面描述的样子了，接下来我们看看更加具体的细节。而这些细节大多是一步步演进过来的。
+到这里我们要补充几个基本概念，了解一下重要的几个常用数据结构的样子。
 
 ## swap_count
 
@@ -220,3 +220,43 @@ Special value in swap_map continuation:
 ```
 
 其实呢，了解了数据结构，就基本能理解后续代码是如何运作的了。这部分主要的函数是swap_count_continued()，这个函数相当于一个对于swap_map的加减法。而函数add_swap_count_continuation()则是在需要的时候扩展相对应的计数空间。当然里面用的招数是链接page->lru，有点高难度了。
+
+# swp_entry
+
+这个swp_entry就是一个索引，用它就可以找到对应的swap_map和swap cache中保存的那个page。
+
+总的来说，这个swp_entry就是将swap_info_struct->type和offset编码存放起来。大致格式如下图所示
+
+```
+    +-+-------------+---------------------------------+
+    | |             |                                 |
+    +-+-------------+---------------------------------+
+      ^             ^                                 ^
+      | type(5bits) |       index/offset              |
+```
+
+具体将type和offset编码，以及从swp_entry解码的函数为：
+
+编码: (type, offset) -> swp_entry
+
+>  entry = swp_entry(type, offset)
+
+解码: swp_entry -> (type, offset)
+
+>  type = swp_type(entry)
+>  offset = swp_offset(entry)
+
+而这个swp_entry在把page释放到设备的时候就会写到pte中。所以这是一个非常重要的结构。
+
+此外对其中的type部分要进一步展开，这个type占用5个bit，但是真正能用来表示swap设备的没有这么多。这个值如下定义：
+
+```
+#define MAX_SWAPFILES \
+	((1 << MAX_SWAPFILES_SHIFT) - SWP_DEVICE_NUM - 	SWP_MIGRATION_NUM - SWP_HWPOISON_NUM)
+```
+
+也就是这些位中会拿出一部分SWP_DEVICE_NUM, SWP_MIGRATION_NUM, SWP_HWPOISON_NUM来表示某些对页做的特殊的操作。比如对于迁移的页面，就会用SWP_MIGRATION_READ|WRITE来表示。
+
+# 演进
+
+基本概念差不多是上面描述的样子了，接下来我们看看更加具体的细节。而这些细节大多是一步步演进过来的。
