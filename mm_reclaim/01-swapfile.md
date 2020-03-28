@@ -260,3 +260,74 @@ Special value in swap_map continuation:
 # 演进
 
 基本概念差不多是上面描述的样子了，接下来我们看看更加具体的细节。而这些细节大多是一步步演进过来的。
+
+## swap_cluster_info for SSD
+
+有好些个优化是基于ssd的，主要的思想是将swap切分成一个个小的cluster，每个cluster是256个页。当然之前也有这个cluster概念，但是并没有用数据结构将它独立出来。
+
+相关的commit有：
+
+```
+815c2c543d3a 2013-09-11 swap: make swap discard async
+2a8f94493432 2013-09-11 swap: change block allocation algorithm for SSD
+
+6b53491598a4 2016-10-02 mm, swap: add swap_cluster_list
+```
+
+前两个是Shaohua的主要贡献，第三个是HuangYing将某些数据结构做了清理，让人更加容易读懂。所以我们现在看到的代码是在HuangYing修改后的版本。
+
+其中重要的数据结构是：
+
+  * cluster_info
+  * free_clusters
+  * discard_clusters
+
+用一张图来展示这三者和swap_map之间的关系会比较好的看清这个的用途：
+
+```
+    struct swap_info_struct
+    +--------------------------------+
+    |                                |    0                                                 maxpages
+    |swap_map                        |   [  |  |  |  |  |   |  |  |  |  |  |  |  |  |  |  |  ]
+    |    (char *)                    |                
+    |                                |
+    |cluster_info                    | [maxpages/SWAPFILE_CLUSTER]
+    |    (swap_cluster_info*)        |
+    |    +---------------------------+
+    |    |lock                       |
+    |    |    (spinlock_t)           |   +---------+   +---------+   +---------+   +---------+
+    |    |data:24                    |   |1        |   |3        |   |count    |   |         |
+    |    |flags:8                    |   |FREE     |   |FREE     |   |         |   |FREE     |
+    |    |    (unsigned int)         |   +---------+   +---------+   +---------+   +---------+
+    |    |                           |    ^      |       ^     |                     ^
+    |    +---------------------------+    |      |       |     |                     |
+    |                                |    |      +-------+     +---------------------+
+    |free_clusters                   |    |                                          |
+    |discard_clusters                |    |                                          |
+    |    (swap_cluster_list)         |    |                                          |
+    |    +---------------------------+    |                                          |
+    |    |head                     --|----+                                          |
+    |    |tail                       |                                               |
+    |    |   (swap_cluster_info)   --|-----------------------------------------------+
+    |    |                           |
+    |    +---------------------------+
+    |                                |
+    +--------------------------------+
+```
+
+我想看到这里基本上能明白了，也就是
+
+  * 对swap_map中，每256个page，创建一个swap_cluster_info。形成一个数组叫cluster_info。
+  * 然后有两个链表，free_clusters和discard_clusters。一个用来分配，一个用来discard
+
+还有两点需要说明：
+
+  * 只有整个cluster都为空，才会加入到free_clusters链表
+  * 初始化时的free_cluster链表不是顺序的，为了防止false cache line sharing
+
+关于这个false cache line sharing，可以参考以下两个commit
+
+```
+4b3ef9daa4fc 2017-02-22 mm/swap: split swap cache into 64MB trunks
+235b62176712 2017-02-22 mm/swap: add cluster lock
+```
