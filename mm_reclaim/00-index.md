@@ -13,7 +13,7 @@ linux内核的设计理念是尽量多使用内存，这样可以最大化系统
 
 对于文件读取的页面，回收时可以放回文件中。而匿名页要释放再利用，就要靠
 
-[swapfile][3]
+[swapfile原理使用和演进][3]
 
 [1]: /mm/00-memory_a_bottom_up_view.md
 [2]: /virtual_mm/00-index.md

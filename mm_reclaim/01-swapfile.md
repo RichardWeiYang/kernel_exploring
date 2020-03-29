@@ -331,3 +331,23 @@ Special value in swap_map continuation:
 4b3ef9daa4fc 2017-02-22 mm/swap: split swap cache into 64MB trunks
 235b62176712 2017-02-22 mm/swap: add cluster lock
 ```
+
+## 分割swap cache
+
+这个方法的理念和cluster类似，也是切分。之前切分的是swap_map，这次切分的是address_space。也就是swapper_space[]。
+
+这个工作就是由下面这个提交完成的。
+
+> 4b3ef9daa4fc 2017-02-22 mm/swap: split swap cache into 64MB trunks
+
+这么一说出来，好像也不怎么神秘了。就是那么一回事儿。
+
+## 一次多分几个
+
+这个优化的理念和之前的，虽然做法上略有不同，但是根本还是一样的。-- 减少频繁得拿锁。
+
+先来看以下这个改进的提交：
+
+> 36005bae205d 2017-02-22 mm/swap: allocate swap slots in batches
+
+其实呢这个改进还要个readahead结合起来说。当有预取的时候，我们会一次性从swap中拿出SWAP_BATCH个entry。改进之前，每次拿一个entry，都会拿一次锁再释放。这样对锁的竞争就比较大。而这次的改进则是对SWAP_BATCH个entry只拿一次锁，这样就减少了竞争。
