@@ -55,6 +55,7 @@
     * [异常向量表的设置](interrupt_exception/04-exception_vector_setup.md)
     * [中断向量和中断函数](interrupt_exception/05-interrupt_handler.md)
     * [APIC](interrupt_exception/06-apic.md)
+    * [时钟中断](interrupt_exception/07-timer_interrupt.md)
 * [设备模型](bus_driver_device/00-device_model.md)
     * [总线](bus_driver_device/01-bus.md)
     * [驱动](bus_driver_device/02-driver.md)

@@ -40,9 +40,20 @@
 
 [APIC][6]
 
+# 重要的中断处理
+
+系统中有些中断处理比较特殊，我们也尝试了解一下。
+
+## 时钟中断
+
+时钟中断对整个系统有特殊的意义。比如调度和RCU，都和时钟中断有关联。
+
+[时钟中断][7]
+
 [1]: /interrupt_exception/01-idt.md
 [2]: /interrupt_exception/02-difference.md
 [3]: /interrupt_exception/03-syscall.md
 [4]: /interrupt_exception/04-exception_vector_setup.md
 [5]: /interrupt_exception/05-interrupt_handler.md
 [6]: /interrupt_exception/06-apic.md
+[7]: /interrupt_exception/07-timer_interrupt.md
