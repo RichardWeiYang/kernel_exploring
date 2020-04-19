@@ -11,6 +11,7 @@
       init_IRQ()
           native_init_IRQ()
               idt_setup_apic_and_irq_gates()
+                  idt_setup_from_table(idt_table, apic_idts, ARRAY_SIZE(apic_idts), true);
                   for_each_clear_bit_from(i, system_vectors, FIRST_SYSTEM_VECTOR) {
                       entry = irq_entries_start + 8 * (i - FIRST_EXTERNAL_VECTOR);
                       set_intr_gate(i, entry);
