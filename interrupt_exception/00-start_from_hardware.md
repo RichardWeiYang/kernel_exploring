@@ -50,6 +50,14 @@
 
 [时钟中断][7]
 
+## 软中断
+
+本质来讲这部分已经不是中断了，而且和硬件没有耦合。之所以放在这里，是因为一来暂时没有别的地方放。二来在某些方面和中断还有关系，比如中断上下文。
+
+嗯，那就先放在这里吧。如果那一天觉得不合适了，再移动。
+
+[软中断][8]
+
 [1]: /interrupt_exception/01-idt.md
 [2]: /interrupt_exception/02-difference.md
 [3]: /interrupt_exception/03-syscall.md
@@ -57,3 +65,4 @@
 [5]: /interrupt_exception/05-interrupt_handler.md
 [6]: /interrupt_exception/06-apic.md
 [7]: /interrupt_exception/07-timer_interrupt.md
+[8]: /interrupt_exception/08-softirq.md
