@@ -58,6 +58,14 @@
 
 [软中断][8]
 
+# 中断、软中断、抢占和多处理器
+
+这也是一个无处安放的章节，因为这个topic其实有点大。Paul老人家还专门写过一本这方面的书--《并行编程》。
+
+暂时我只看了点皮毛，不过有些概念觉得实在是太重要了。必须找个地方记录一下，否则下次来看又忘记了。
+
+[中断、软中断、抢占和多处理器][9]
+
 [1]: /interrupt_exception/01-idt.md
 [2]: /interrupt_exception/02-difference.md
 [3]: /interrupt_exception/03-syscall.md
@@ -66,3 +74,4 @@
 [6]: /interrupt_exception/06-apic.md
 [7]: /interrupt_exception/07-timer_interrupt.md
 [8]: /interrupt_exception/08-softirq.md
+[9]: /interrupt_exception/09-irq_softirq_preempt_and_smp.md

@@ -57,6 +57,7 @@
     * [APIC](interrupt_exception/06-apic.md)
     * [时钟中断](interrupt_exception/07-timer_interrupt.md)
     * [软中断](interrupt_exception/08-softirq.md)
+    * [中断、软中断、抢占和多处理器](interrupt_exception/09-irq_softirq_preempt_and_smp.md)
 * [设备模型](bus_driver_device/00-device_model.md)
     * [总线](bus_driver_device/01-bus.md)
     * [驱动](bus_driver_device/02-driver.md)
