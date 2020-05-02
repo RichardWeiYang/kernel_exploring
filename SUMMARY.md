@@ -80,3 +80,5 @@
     * [双链表](data_struct/01-list.md)
     * [优先级队列](data_struct/03-plist.md)
     * [哈希表](data_struct/02-hlist.md)
+* [Trace/Profie/Debug](tracing/00-index.md)
+    * [eBPF初探](tracing/01-ebpf.md)
