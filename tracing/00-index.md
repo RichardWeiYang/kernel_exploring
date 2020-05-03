@@ -8,4 +8,11 @@
 
 [eBPF初探][1] 严重怀疑后续可能要完整的一章来讲述清楚。
 
+对eBPF的探索中，发现他和内核系统中其他的探测机制有着非常深厚的关联。
+
+比如:
+
+[TraceEvent][2]
+
 [1]: /tracing/01-ebpf.md
+[2]: /tracing/02-trace_event.md
