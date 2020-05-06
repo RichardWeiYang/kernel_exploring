@@ -81,5 +81,6 @@
     * [优先级队列](data_struct/03-plist.md)
     * [哈希表](data_struct/02-hlist.md)
 * [Trace/Profie/Debug](tracing/00-index.md)
+    * [ftrace的使用](tracing/03-ftrace_usage.md)
     * [eBPF初探](tracing/01-ebpf.md)
     * [TraceEvent](tracing/02-trace_event.md)
