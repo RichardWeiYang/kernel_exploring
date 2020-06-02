@@ -184,7 +184,7 @@ ftrace_make_nop(mod, rec, MCOUNT_ADDR)
 
 真的是煞费苦心啊。
 
-# 动态替换
+# 动态替换 -- 替换谁
 
 初始化完成之后，我们关心的是怎么样能够再次打开探针。首先我们得找到这种操作的入口，比如set_ftrace_filter文件。当然这又是一场艰苦卓绝的探索之旅。
 
@@ -251,10 +251,80 @@ match_records()
         } while_for_each_ftrace_rec();
 ```
 
-还记不记得这个do_for_each_ftrace_rec()?其实就是遍历了整个谈征的记录，根据index找到究竟是要操作哪个探针。然后通过enter_record()这个这个探针添加到ftrace_hash这个哈希表中。
+还记不记得这个do_for_each_ftrace_rec()?其实就是遍历了整个探针的记录，根据index找到究竟是要操作哪个探针。然后通过enter_record()这个这个探针添加到ftrace_hash这个哈希表中。
 
-但是这样就结束了么？当然不是，我们还没有真正的去修改代码呢。那这部分隐藏在哪里？原来是在ftrace_regex_release()函数中。
+但是这样就结束了么？当然不是。到这里我们只是找到了一次修改时需要修改哪些探针地址，但是我们还没有真正的去修改代码呢。
 
+那这部分隐藏在哪里？之前我们是从文件写操作ftrace_filter_write开始的，而这个秘密就隐藏在文件关闭的操作ftrace_regex_release()函数中。
 
+# 动态替换 -- 改代码
+
+在函数ftrace_regex_release()，对于写操作执行的重要任务通过ftrace_hash_move_and_update_ops()来完成。
+
+```
+ftrace_regex_release()
+  ftrace_hash_move_and_update_ops()
+    ftrace_hash_move()                (1)
+    ftrace_ops_update_code()          (2)
+```
+
+也就是这个工作分成了两步
+
+  * (1) 将ftrace_iterator->hash移动到ftrace_ops->func_hash上
+  * (2) 真正的改动代码
+
+第一步是将本地的record表同步到全局变量ftrace_ops中去，对这个数据类型我们将后续介绍。先来看真正执行代码改动的地方ftrace_ops_update_code()。
+
+```
+ftrace_ops_update_code
+    ftrace_run_modify_code
+        ftrace_run_update_code(FTRACE_UPDATE_CALLS)
+            ftrace_arch_code_modify_prepare
+                mutex_lock(&text_mutex);
+                ftrace_poke_late = 1;
+            arch_ftrace_update_code(FTRACE_UPDATE_CALLS)
+                ftrace_replace_code()
+            ftrace_arch_code_modify_post_process
+                text_poke_finish();
+                ftrace_poke_late = 0;
+                mutex_unlock(&text_mutex);
+```
+
+这么看什么也没看出来，事实证明我们还要花一些耐心，需要继续探索ftrace_replace_code()。
+
+```
+ftrace_replace_code()
+    ftrace_test_record(rec,), check dyn_ftrace.flags
+        ftrace_check_record(rec, enable, false)
+    old = ftrace_call_replace(rec->ip, ftrace_get_addr_curr(rec))
+        ftrace_get_addr_curr(rec)
+        text_gen_insn(CALL_INSN_OPCODE, rec->ip, ftrace_caller)
+    ftrace_verify_code(rec->ip, old)
+    new = ftrace_call_replace(rec->ip, ftrace_get_addr_new(rec))
+        ftrace_get_addr_new(rec)
+    text_poke_queue(rec->ip, new, MCOUNT_INSN_SIZE, NULL)
+    ftrace_update_record(rec), update dyn_ftrace.flags
+        ftrace_check_record(rec, enable, true)
+    text_poke_finish()
+        text_poke_bp_batch(tp_vec, tp_vec_nr), update instruction on live kernel
+           text_poke(), the secret of modify kernel exec region
+```
+
+到这里，我们基本能看出一些端倪。
+
+   * 找到旧的指令 -- old
+   * 找到新的指令 -- new
+   * 用text_poke()将old替换成new
+
+而在作者slide[Ftrace Kernel Hooks: More than just tracing][1]中提到的使用断点来保证一致性的方法在text_poke_bp_batch()中，有兴趣的朋友可以进去看，注释写得很清楚了。
+
+最后的text_poke()也是一个非常有意思的东西。大家都知道内核代码是只读的，为了能够对代码有写的能力，另起炉灶的增加了一个mm_struct结构体，将需要修改的代码mapping到页表中。然后切换到这个临时的页表。这个还是很神奇的。
+
+到这里，我们终于弄懂了ftrace最基本的原理：
+
+   * 插入探针函数
+   * 动态修改探针
+
+当然这一切仅仅是开始。
 
 [1]: https://blog.linuxplumbersconf.org/2014/ocw/system/presentations/1773/original/ftrace-kernel-hooks-2014.pdf
