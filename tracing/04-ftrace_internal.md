@@ -152,7 +152,7 @@ ftrace_init
 
 其中有两个for循环，一个是遍历ftrace_pages_start为首的链表，一个是编译每个ftrace_page的records。
 
-# 替换成nop
+# 初始化成nop
 
 在最开始我们看到了探针__fentry__的定义。虽然在动态ftrace的情况下，这个函数调用直接返回，但是毕竟每个函数都来这么以此跳转对内核的性能也是影响很大的。
 
@@ -184,7 +184,9 @@ ftrace_make_nop(mod, rec, MCOUNT_ADDR)
 
 真的是煞费苦心啊。
 
-# 动态替换 -- 替换谁
+# 动态替换
+
+## 替换谁
 
 初始化完成之后，我们关心的是怎么样能够再次打开探针。首先我们得找到这种操作的入口，比如set_ftrace_filter文件。当然这又是一场艰苦卓绝的探索之旅。
 
@@ -257,7 +259,7 @@ match_records()
 
 那这部分隐藏在哪里？之前我们是从文件写操作ftrace_filter_write开始的，而这个秘密就隐藏在文件关闭的操作ftrace_regex_release()函数中。
 
-# 动态替换 -- 改代码
+## 改代码
 
 在函数ftrace_regex_release()，对于写操作执行的重要任务通过ftrace_hash_move_and_update_ops()来完成。
 
@@ -283,6 +285,7 @@ ftrace_ops_update_code
                 mutex_lock(&text_mutex);
                 ftrace_poke_late = 1;
             arch_ftrace_update_code(FTRACE_UPDATE_CALLS)
+                ftrace_update_ftrace_func()
                 ftrace_replace_code()
             ftrace_arch_code_modify_post_process
                 text_poke_finish();
@@ -326,5 +329,124 @@ ftrace_replace_code()
    * 动态修改探针
 
 当然这一切仅仅是开始。
+
+## 替换成谁
+
+我们知道，ftrace可以通过文件current_tracer来选择不同的tracer，输出不同的记录。也就是表明，相同的探针，在不同的情况下会执行不同的代码。所以在动态替换的时候，实际上替换了不同的函数。
+
+回顾一下我们刚才替换的流程：
+
+```
+ftrace_replace_code()
+    ...
+    new = ftrace_call_replace(rec->ip, ftrace_get_addr_new(rec))
+        ftrace_get_addr_new(rec)
+    ...
+```
+
+而这个ftrace_get_addr_new(rec)其中情况之一是返回FTRACE_ADDR，既ftrace_caller。这也是在作者slide[Ftrace Kernel Hooks: More than just tracing][1]中提到的函数。
+
+是时候打开这个函数了：
+
+```
+SYM_FUNC_START(ftrace_caller)
+	/* save_mcount_regs fills in first two parameters */
+	save_mcount_regs
+
+SYM_INNER_LABEL(ftrace_caller_op_ptr, SYM_L_GLOBAL)
+	/* Load the ftrace_ops into the 3rd parameter */
+	movq function_trace_op(%rip), %rdx
+
+	/* regs go into 4th parameter (but make it NULL) */
+	movq $0, %rcx
+
+SYM_INNER_LABEL(ftrace_call, SYM_L_GLOBAL)
+	call ftrace_stub
+
+	restore_mcount_regs
+
+	/*
+	 * The code up to this label is copied into trampolines so
+	 * think twice before adding any new code or changing the
+	 * layout here.
+	 */
+SYM_INNER_LABEL(ftrace_epilogue, SYM_L_GLOBAL)
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+SYM_INNER_LABEL(ftrace_graph_call, SYM_L_GLOBAL)
+	jmp ftrace_stub
+#endif
+
+/*
+ * This is weak to keep gas from relaxing the jumps.
+ * It is also used to copy the retq for trampolines.
+ */
+SYM_INNER_LABEL_ALIGN(ftrace_stub, SYM_L_WEAK)
+	retq
+SYM_FUNC_END(ftrace_caller)
+```
+
+正如slide中写到，原始代码调用了ftrace_stub后就直接返回了，其实啥也没做。这次又跪了，感觉线索又断了。
+
+稍等，刚才不是说到操作current_tracer可以获得不同的trace输出么？那就从这个方向去找找看？
+
+写current_tracer文件由tracing_set_trace_write函数接管，之后就调用了tracing_set_tracer。
+
+```
+tracing_set_tracer
+    tracer_init(struct tracer *t, struct trace_array *tr)
+        t->init(tr) -> e.g. function_trace_init
+            func = function_trace_call
+            ftrace_init_array_ops(tr, func)
+                tr->ops->func = func;                             --- (1)
+                tr->ops->private = tr;
+            tracing_start_function_trace(tr)
+                register_ftrace_function(tr->ops)
+                    ftrace_startup(ops, 0);
+                        __register_ftrace_function(ops);
+                            update_ftrace_function
+                                func = ftrace_ops_list_func;      --- (2)
+                                ftrace_trace_function = func;     --- (3)
+```
+
+有几个地方值得注意：
+
+  * (1) 在这里我们设置了trace_ops->func，比如对于function这个tracer，可能的函数是function_trace_call
+  * (2) 在这里我们又获取了一个函数 ftrace_ops_list_func，具体内容我们待会儿来看
+  * (3) 而最后，我们又把这个函数的地址赋值给了变量 ftrace_trace_function
+
+啊，这一切真是让人眼花缭乱啊。
+
+此时请允许我们再次回过去看替换探针时发生的情况，其中有一个函数叫arch_ftrace_update_code，当时我们跳（hu）过（lue）了它。
+
+```
+ftrace_update_ftrace_func(ftrace_ops_list_func)
+    ip = (unsigned long)(&ftrace_call);
+    new = ftrace_call_replace(ip, (unsigned long)ftrace_ops_list_func);
+    text_poke_bp((void *)ip, new, MCOUNT_INSN_SIZE, NULL);
+
+    ip = (unsigned long)(&ftrace_regs_call);
+    new = ftrace_call_replace(ip, (unsigned long)ftrace_ops_list_func);
+    text_poke_bp((void *)ip, new, MCOUNT_INSN_SIZE, NULL);    
+```
+
+所以在替换探针之前，就将我们疑惑的ftrace_call替换成了ftrace_ops_list_func呀。真实大水冲了龙王庙，一家人不认识一家人。
+当然，如果你再仔细看，将ftrace_trace_function赋值成ftrace_ops_list_func在某些地方还有特殊的用途。我们这里先跳过，默认ftrace_call被替换成了ftrace_ops_list_func。
+
+```
+do_for_each_ftrace_op(op) {
+  ...
+  op->func(ip, parent_ip, op, regs);
+  ...
+}  while_for_each_ftrace_op(op);
+```
+
+整个函数当然有很多细节，但是整体来将就是遍历了所有ftrace_ops，如果满足条件就调用ops->func。
+
+还记得这个func是谁么？对了，就是**function_trace_call**！
+
+ok, 到这里我们终于把ftrace从定义到替换的路走了一遍。虽然还有很多未知的和值得探索的内容，但是在代码替换的这条路上我们已经走通了。
+
+剩下的未知，待我们来日再探。
 
 [1]: https://blog.linuxplumbersconf.org/2014/ocw/system/presentations/1773/original/ftrace-kernel-hooks-2014.pdf
