@@ -83,5 +83,6 @@
 * [Trace/Profie/Debug](tracing/00-index.md)
     * [ftrace的使用](tracing/03-ftrace_usage.md)
     * [探秘ftrace](tracing/04-ftrace_internal.md)
+    * [内核热补丁的黑科技](tracing/05-kernel_live_patch.md)
     * [eBPF初探](tracing/01-ebpf.md)
     * [TraceEvent](tracing/02-trace_event.md)

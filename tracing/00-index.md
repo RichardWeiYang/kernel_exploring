@@ -14,6 +14,10 @@
 
 [探秘ftrace][5]
 
+了解了原理后，我们来看看都有哪些工具会依赖ftrace。
+
+比如 [内核热补丁的黑科技][6]。这个看上去不像是trace的工具，却依赖ftrace框架来实现的。
+
 接着来看的是传说为瑞士军刀的[eBPF初探][1].
 严重怀疑后续可能要完整的一章来讲述清楚。
 
@@ -28,3 +32,4 @@
 [3]: https://www.ibm.com/developerworks/cn/linux/1609_houp_ftrace/index.html
 [4]: /tracing/03-ftrace_usage.md
 [5]: /tracing/04-ftrace_internal.md
+[6]: /tracing/05-kernel_live_patch.md
