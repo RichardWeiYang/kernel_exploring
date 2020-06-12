@@ -29,24 +29,27 @@ total 56
 
 编译
 
-  # make M=samples/trace_events
+  > make M=samples/trace_events
 
 然后加载这个例子模块
 
-  # modprobe trace-events-sample
+  > modprobe trace-events-sample
 
 因为用户接口在debugfs上，所以还要确保debugfs挂载了。
 
-  # mount -t debugfs none /sys/kernel/debug/
+  > mount -t debugfs none /sys/kernel/debug/
 
 此时我们就能在 /sys/kernel/debug/tracing/events/sample-trace/ 目录下看到该模块创建好的trace event了。
 
 接下来，我们就可以打开这个探测时间，并且查看探测的输出了。
 
-  # cd /sys/kernel/debug/tracing
-  # echo 1 > events/sample-trace/enable
-  # cat trace
-  # echo 0 > events/sample-trace/enable
+  > cd /sys/kernel/debug/tracing
+
+  > echo 1 > events/sample-trace/enable
+
+  > cat trace
+
+  > echo 0 > events/sample-trace/enable
 
 通过cat trace观察，可以看出系统运行时的一些状态。
 
