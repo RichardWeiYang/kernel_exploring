@@ -36,6 +36,7 @@
     * [slub的理念](mm/08-slub_general.md)
     * [图解slub](mm/09-slub_in_graph.md)
     * [页分配器的用户们](mm/11-users_of_buddy.md)
+    * [内存管理的不同粒度](mm/13-physical-layer-partition.md)
     * [挑战和进化](mm/50-challenge_evolution.md)
         * [扩展性的设计和实现](mm/51-scalability_design_implementation.md)
         * [海量内存](mm/52-hugh_memory.md)
