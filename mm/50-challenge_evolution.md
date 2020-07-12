@@ -29,5 +29,5 @@
 [内存热插拔][3]
 
 [1]: /mm/51-scalability_design_implementation.md
-[2]: /mm/52-hugh_memory.md
+[2]: /mm/52-where_is_page_struct.md
 [3]: /mm/53-memory_hotplug.md
