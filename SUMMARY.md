@@ -40,6 +40,7 @@
     * [挑战和进化](mm/50-challenge_evolution.md)
         * [扩展性的设计和实现](mm/51-scalability_design_implementation.md)
         * [海量内存](mm/52-where_is_page_struct.md)
+        * [延迟初始化](mm/54-defer_init.md)
         * [内存热插拔](mm/53-memory_hotplug.md)
 * [虚拟内存空间](virtual_mm/00-index.md)
   * [页表和缺页中断](virtual_mm/03-page_table_fault.md)

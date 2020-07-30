@@ -20,7 +20,13 @@
 
 这一小节和上一小节观察的重点不同。而是主要观察内存控制结构struct page的空间分配和初始化。
 
+首先我们来看空间分配上为了应对海量内存做的一步步演进。
+
 [海量内存][2]
+
+其次随着内存容量的增加，需要初始化的page struct也增加。为此内核引入了延迟初始化。
+
+[延迟初始化][4]
 
 # 内存热插拔
 
@@ -31,3 +37,4 @@
 [1]: /mm/51-scalability_design_implementation.md
 [2]: /mm/52-where_is_page_struct.md
 [3]: /mm/53-memory_hotplug.md
+[4]: /mm/54-defer_init.md
