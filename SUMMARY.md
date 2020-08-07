@@ -44,7 +44,7 @@
         * [内存热插拔](mm/53-memory_hotplug.md)
 * [虚拟内存空间](virtual_mm/00-index.md)
   * [页表和缺页中断](virtual_mm/03-page_table_fault.md)
-  * [vma](virtual_mm/05-vma.md)
+  * [虚拟地址空间的管家--vma](virtual_mm/05-vma.md)
   * [匿名反向映射的前世今生](virtual_mm/01-anon_rmap_history.md)
   * [图解匿名反向映射](virtual_mm/06-anon_rmap_usage.md)
   * [THP和mapcount之间的恩恩怨怨](virtual_mm/02-thp_mapcount.md)
