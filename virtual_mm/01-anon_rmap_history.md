@@ -36,16 +36,16 @@ page, can return a list of PTEs which point to that page.
 
 首先我们来描述一下这个想法的背景，在[The object-based reverse-mapping][2]和[the return of objrmap][3]写到：
 
-  通常来说，用户的页面有两种类型：
+通常来说，用户的页面有两种类型：
 
     * Anonymous page
     * file-backed page
 
-  对于file-backed page，[The object-based reverse-mapping][2]提到我们已经有了一个**长**路径来找到对应的页表。这就意味这pte_chain对file-backed page是不必要的。
+对于file-backed page，[The object-based reverse-mapping][2]提到我们已经有了一个**长**路径来找到对应的页表。这就意味这pte_chain对file-backed page是不必要的。
 
-  对anonymous pages就没有什么**长**路径了，[the return of objrmap][3]引入了anon_vma来解决这个问题。
+对anonymous pages就没有什么**长**路径了，[the return of objrmap][3]引入了anon_vma来解决这个问题。
 
-虽然我没有找到具体是哪个commit引入的这个方法，但是我相信这一定是下一章提到的commit之前的情形。
+虽然我没有找到具体是哪个commit引入的这个方法，但是我相信这一定是下一节提到的commit之前的情形。
 
 在[the return of objrmap][3]有两个图来解释这个想法。
 
