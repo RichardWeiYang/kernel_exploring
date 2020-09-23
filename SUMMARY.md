@@ -49,6 +49,7 @@
   * [图解匿名反向映射](virtual_mm/06-anon_rmap_usage.md)
   * [THP和mapcount之间的恩恩怨怨](virtual_mm/02-thp_mapcount.md)
   * [透明大页的玄机](virtual_mm/04-thp.md)
+  * [NUMA策略](virtual_mm/07-mempolicy.md)
 * [内存的回收再利用](mm_reclaim/00-index.md)
   * [水线](mm_reclaim/02-watermark.md)
   * [swapfile原理使用和演进](mm_reclaim/01-swapfile.md)

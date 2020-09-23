@@ -46,6 +46,12 @@
 
 [透明大页的玄机][5]
 
+# NUMA策略
+
+当系统中存在多个numa节点时，内存从哪个numa节点上分配就变得有些重要了。因为这会影响到系统运行的性能。
+
+内核中为了应对这个问题，提出了[NUMA策略][8]
+
 [1]: /mm/00-memory_a_bottom_up_view.md
 [2]: /virtual_mm/01-anon_rmap_history.md
 [3]: /virtual_mm/02-thp_mapcount.md
@@ -53,3 +59,4 @@
 [5]: /virtual_mm/04-thp.md
 [6]: /virtual_mm/05-vma.md
 [7]: /virtual_mm/06-anon_rmap_usage.md
+[8]: /virtual_mm/07-mempolicy.md
