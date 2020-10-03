@@ -52,6 +52,8 @@
 
 内核中为了应对这个问题，提出了[NUMA策略][8]
 
+同时为了保持进程迁移过程中内存策略的一致，内核还提供了[numa balance][9]。
+
 [1]: /mm/00-memory_a_bottom_up_view.md
 [2]: /virtual_mm/01-anon_rmap_history.md
 [3]: /virtual_mm/02-thp_mapcount.md
@@ -60,3 +62,4 @@
 [6]: /virtual_mm/05-vma.md
 [7]: /virtual_mm/06-anon_rmap_usage.md
 [8]: /virtual_mm/07-mempolicy.md
+[9]: /virtual_mm/08-numa_balance.md

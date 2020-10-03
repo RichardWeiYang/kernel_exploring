@@ -50,6 +50,7 @@
   * [THP和mapcount之间的恩恩怨怨](virtual_mm/02-thp_mapcount.md)
   * [透明大页的玄机](virtual_mm/04-thp.md)
   * [NUMA策略](virtual_mm/07-mempolicy.md)
+  * [numa balance](virtual_mm/08-numa_balance.md)
 * [内存的回收再利用](mm_reclaim/00-index.md)
   * [水线](mm_reclaim/02-watermark.md)
   * [swapfile原理使用和演进](mm_reclaim/01-swapfile.md)
