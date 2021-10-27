@@ -93,3 +93,4 @@
     * [eBPF初探](tracing/01-ebpf.md)
     * [TraceEvent](tracing/02-trace_event.md)
 * [cgroup](cgroup/00-index.md)
+    * [使用cgroup控制进程cpu和内存](cgroup/01-control_cpu_mem_by_cgroup.md)
