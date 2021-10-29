@@ -8,9 +8,14 @@ cgroup是计算机资源管理常用的管理设施，尤其是在云计算环�
 
 # cgroup文件系统
 
+在上一节基本使用中，我们通过创建目录，向指定文件写入内容来使用cgroup。我想你也一定好奇，为什么这么操作就能达到这样的效果？
+
+这一切都要归功于[cgroup文件系统][2]
+
 # cgroup树形结构
 
 # cgropu和进程
 
 
 [1]: /cgroup/01-control_cpu_mem_by_cgroup.md
+[2]: /cgroup/02-cgroup_fs.md
