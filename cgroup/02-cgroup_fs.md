@@ -44,4 +44,66 @@ fsconfig()
 
 ![cgroup_fs_context](/cgroup/cgroup_fs_context.png)
 
-回过头来我仔细一想才发现
+回过头来我仔细一想才发现，这些操作的目的是**在get_tree()时绑定文件系统挂载点和cgroup层次结构**。也就是上图中的 fs_context->root 和 cgroup_fs_context->root。
+
+## 谁挂载了cgroup
+
+在上一节使用示例中我们直接在目录/sys/fs/cgroup上操作，也可以用mount查看到cgroup文件系统的挂载情况。
+
+```
+richard@richard:~$ mount | grep cgroup
+tmpfs on /sys/fs/cgroup type tmpfs (ro,nosuid,nodev,noexec,mode=755)
+cgroup on /sys/fs/cgroup/systemd type cgroup (rw,nosuid,nodev,noexec,relatime,xattr,name=systemd)
+cgroup on /sys/fs/cgroup/freezer type cgroup (rw,nosuid,nodev,noexec,relatime,freezer)
+cgroup on /sys/fs/cgroup/net_cls,net_prio type cgroup (rw,nosuid,nodev,noexec,relatime,net_cls,net_prio)
+cgroup on /sys/fs/cgroup/rdma type cgroup (rw,nosuid,nodev,noexec,relatime,rdma)
+cgroup on /sys/fs/cgroup/hugetlb type cgroup (rw,nosuid,nodev,noexec,relatime,hugetlb)
+cgroup on /sys/fs/cgroup/pids type cgroup (rw,nosuid,nodev,noexec,relatime,pids)
+cgroup on /sys/fs/cgroup/cpu,cpuacct type cgroup (rw,nosuid,nodev,noexec,relatime,cpu,cpuacct)
+cgroup on /sys/fs/cgroup/cpuset type cgroup (rw,nosuid,nodev,noexec,relatime,cpuset)
+cgroup on /sys/fs/cgroup/perf_event type cgroup (rw,nosuid,nodev,noexec,relatime,perf_event)
+cgroup on /sys/fs/cgroup/memory type cgroup (rw,nosuid,nodev,noexec,relatime,memory)
+cgroup on /sys/fs/cgroup/devices type cgroup (rw,nosuid,nodev,noexec,relatime,devices)
+cgroup on /sys/fs/cgroup/blkio type cgroup (rw,nosuid,nodev,noexec,relatime,blkio)
+```
+
+那究竟是谁挂载了这个目录呢？网上有很多文章说是systemd挂载的。
+
+大致扫了一眼代码和注释，估计是下面的代码干的活。
+
+```
+static const MountPoint mount_table[] = {
+    ...
+    { "tmpfs",       "/sys/fs/cgroup",            "tmpfs",      "mode=755" TMPFS_LIMITS_SYS_FS_CGROUP,     MS_NOSUID|MS_NOEXEC|MS_NODEV|MS_STRICTATIME,
+      cg_is_legacy_wanted, MNT_FATAL|MNT_IN_CONTAINER },
+    ...
+}
+
+main()
+  mount_setup_early()
+    mount_points_setup()
+      mount_one(mount_table + i, )
+  initialize_runtime()
+    mount_cgroup_controllers()
+```
+
+先挂载了/sys/fs/cgroup, 再挂载内核支持的cgroup。具体内核支持哪些cgroup从下面的文件获取。
+
+```
+# cat /proc/cgroups
+#subsys_name	hierarchy	num_cgroups	enabled
+cpuset	9	1	1
+cpu	2	67	1
+cpuacct	2	67	1
+blkio	5	67	1
+memory	10	140	1
+devices	4	67	1
+freezer	11	1	1
+net_cls	8	1	1
+perf_event	7	1	1
+net_prio	8	1	1
+hugetlb	3	1	1
+pids	6	68	1
+```
+
+据说cgroupv2的挂载在另外一个地方，但是心急的我就先跳过这段吧。
