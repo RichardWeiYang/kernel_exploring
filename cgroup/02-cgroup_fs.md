@@ -107,3 +107,199 @@ pids	6	68	1
 ```
 
 据说cgroupv2的挂载在另外一个地方，但是心急的我就先跳过这段吧。
+
+# 创建相关文件
+
+现在我们有了文件系统，也找到了是谁在哪里挂载了文件系统，接下来的问题就是那些文件从哪里来。
+
+在上一节的例子中，我们通过写文件/sys/fs/cgroup/cpuset/test/cpuset.cpus来控制进程运行的cpu。那这个文件是哪里创建的呢？如果知道了这个文件后面的函数，我们不就知道linux是如何实现对进程调度的控制了吗。
+
+这件事呢，说简单也简单，说复杂呢也有点复杂。因为相关文件的创建嵌套在整个cgroup系统的构造过程中。有些相互关联的概念会影响文件创建的过程。为了避免本节的内容太过发散，在这里我们主要来看创建文件过程中最有桥梁作用的函数**css_populate_dir**。
+
+这个函数本身不长，为了较好理解，我把这个函数的核心部分贴上来。
+
+```
+static int css_populate_dir(struct cgroup_subsys_state *css)
+{
+	struct cgroup *cgrp = css->cgroup;
+	struct cftype *cfts, *failed_cfts;
+
+	if (!css->ss) {
+		if (cgroup_on_dfl(cgrp))
+			cfts = cgroup_base_files;
+		else
+			cfts = cgroup1_base_files;
+
+		ret = cgroup_addrm_files(&cgrp->self, cgrp, cfts, true);
+		if (ret < 0)
+			return ret;
+	} else {
+		list_for_each_entry(cfts, &css->ss->cfts, node) {
+			ret = cgroup_addrm_files(css, cgrp, cfts, true);
+			if (ret < 0) {
+				failed_cfts = cfts;
+				goto err;
+			}
+		}
+	}
+
+	return 0;
+```
+
+上面的逻辑不难理解。一共有两种情况，但是最后都调用了cgroup_addrm_files()来创建对应的文件。而cgroup_addrm_files()展开为
+
+```
+cgroup_addrm_files(css, cgrp, cfts)
+  cgroup_add_file(css, cgrp, cft)
+    kn = __kernfs_create_file(cgrp->kn, cgroup_file_name(cgrp, cft, name),
+      ..., cft->kf_ops, cft, ...)
+```
+
+这么看，这个函数的功能是
+
+  * 在对应的cgroup目录下
+  * 创建了一个名字为cgroup_file_name(cgrp, cft, name)的文件
+  * 文件操作对应的回调函数是cft->kf_ops
+
+知道了这些后，我们的问题就变成：
+
+  * 这些cft是哪里来的？
+
+再回到函数 css_populate_dir()， cft的来源根据css->ss的值分成两种情况。
+
+  * cgroup基础文件
+  * cgroup特定文件
+
+## cgroup基础文件
+
+cgroup基础文件就是每个cgroup目录下都会有的文件，如：
+
+```
+root@master:/sys/fs/cgroup# ls cpu/cgroup.*
+cpu/cgroup.clone_children  cpu/cgroup.procs  cpu/cgroup.sane_behavior
+root@master:/sys/fs/cgroup# ls cpuset/cgroup.*
+cpuset/cgroup.clone_children  cpuset/cgroup.procs  cpuset/cgroup.sane_behavior
+```
+
+在cpu/cpuset目录下，我们都能看到这几个文件。而这些就是不论使用的是哪个cgroup都会有的文件。这些文件对应的cft就是cgroup1_base_files/cgroup_base_files。
+
+打开cgroup1_base_files这个结构体一看，果然那几个文件名都在。（下面结构体略有删减）
+
+```
+/* cgroup core interface files for the legacy hierarchies */
+struct cftype cgroup1_base_files[] = {
+	{
+		.name = "cgroup.procs",
+		.seq_start = cgroup_pidlist_start,
+		.seq_next = cgroup_pidlist_next,
+		.seq_stop = cgroup_pidlist_stop,
+		.seq_show = cgroup_pidlist_show,
+		.private = CGROUP_FILE_PROCS,
+		.write = cgroup1_procs_write,
+	},
+	{
+		.name = "cgroup.clone_children",
+		.read_u64 = cgroup_clone_children_read,
+		.write_u64 = cgroup_clone_children_write,
+	},
+	{
+		.name = "cgroup.sane_behavior",
+		.flags = CFTYPE_ONLY_ON_ROOT,
+		.seq_show = cgroup_sane_behavior_show,
+	},
+	{
+		.name = "tasks",
+		.seq_start = cgroup_pidlist_start,
+	},
+	{
+		.name = "notify_on_release",
+		.read_u64 = cgroup_read_notify_on_release,
+		.write_u64 = cgroup_write_notify_on_release,
+	},
+	{
+		.name = "release_agent",
+		.flags = CFTYPE_ONLY_ON_ROOT,
+	},
+	{ }	/* terminate */
+};
+```
+
+这样，我们想要了解echo $pid > cgroup.procs都发生了什么，是不是就知道去哪里找了呢？
+
+## cgroup特定文件
+
+顾名思义，特定文件就是某个cgroup特有的文件。 如：
+
+```
+root@master:/sys/fs/cgroup/cpuset# ll
+total 0
+dr-xr-xr-x  2 root root   0 Sep 21 01:17 ./
+drwxr-xr-x 13 root root 340 Jul  3 13:40 ../
+-rw-r--r--  1 root root   0 Nov 16 00:51 cgroup.clone_children
+-rw-r--r--  1 root root   0 Nov 16 00:51 cgroup.procs
+-r--r--r--  1 root root   0 Nov 16 00:51 cgroup.sane_behavior
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.cpu_exclusive
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.cpus
+-r--r--r--  1 root root   0 Nov 16 00:51 cpuset.effective_cpus
+-r--r--r--  1 root root   0 Nov 16 00:51 cpuset.effective_mems
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.mem_exclusive
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.mem_hardwall
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.memory_migrate
+-r--r--r--  1 root root   0 Nov 16 00:51 cpuset.memory_pressure
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.memory_pressure_enabled
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.memory_spread_page
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.memory_spread_slab
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.mems
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.sched_load_balance
+-rw-r--r--  1 root root   0 Nov 16 00:51 cpuset.sched_relax_domain_level
+-rw-r--r--  1 root root   0 Nov 16 00:51 notify_on_release
+-rw-r--r--  1 root root   0 Nov 16 00:51 release_agent
+-rw-r--r--  1 root root   0 Nov 16 00:51 tasks
+```
+
+在cpuset目录下，还有很多以cpuset开头的文件。那他们都是从哪里来的呢？
+
+从函数css_populate_dir()中，可以看到这里的cfts从css->ss->cfts上获得。而这个链表的初始化在下面的函数调用过程中：
+
+```
+cgroup_init()
+  cgroup_add_dfl_cftypes(ss, ss->dfl_cftypes)
+  cgroup_add_legacy_cftypes(ss, ss->legacy_cftypes)
+    cgroup_add_cftypes()
+      list_add_tail(&cfts->node, &ss->cfts);
+```
+
+也就是把ss->legacy_cftypes/dfl_cftypes挂载到了ss->cfts链表上。其表现形式用图表示为：
+
+```
+cgroup_subsys
++-------------------------------+<----------------------------------------+
+|name                           |                                         |
+|                               |                                         |
+|dfl_cftypes                    |  be populated by css_populate_dir()     |
+|legacy_cftypes                 |                                         |
+|    (struct cftype*)           |                                         |
+|                               |    dfl_cftypes       legacy_cftypes     |
+|                               |    +------------+    +------------+     |
+|cfts                        ---|--->|node     ---|--->|node        |     |
+|    (struct list_head)         |    |ss          |    |ss       ---|-----+
+|                               |    |kf_ops      |    |kf_ops      |
+|                               |    +------------+    +------------+    
+|                               |
++-------------------------------+
+```
+
+看了一圈后，我们再回过头来看解答这个问题： 在cpuset目录下，以cpuset开头的文件是哪里来的？
+
+对了，那就看cpuset_cgrp_subsys->dfl_ctypes/legacy_cftypes。
+
+```
+struct cgroup_subsys cpuset_cgrp_subsys = {
+	.legacy_cftypes	= legacy_files,
+	.dfl_cftypes	= dfl_files,
+};
+```
+
+但是细心的朋友可能发现，legacy_files和dfl_files里面有重名的文件。那究竟是用的哪个呢？
+
+那就要看cgroup_add_legacy_cftypes()/cgroup_add_dfl_cftypes()函数中给cft添加的flag，以及cgroup_addrm_files()中对flag判断的共同作用了～
