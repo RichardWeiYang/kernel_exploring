@@ -108,7 +108,7 @@ pids	6	68	1
 
 据说cgroupv2的挂载在另外一个地方，但是心急的我就先跳过这段吧。
 
-# 创建相关文件
+# 相关文件创建
 
 现在我们有了文件系统，也找到了是谁在哪里挂载了文件系统，接下来的问题就是那些文件从哪里来。
 
@@ -303,3 +303,18 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
 但是细心的朋友可能发现，legacy_files和dfl_files里面有重名的文件。那究竟是用的哪个呢？
 
 那就要看cgroup_add_legacy_cftypes()/cgroup_add_dfl_cftypes()函数中给cft添加的flag，以及cgroup_addrm_files()中对flag判断的共同作用了～
+
+## 文件与cgroup之间的关联
+
+刚才我们看了cgroup_addrm_files()函数创建了cgroup相关文件，那这些文件是如何与cgroup产生关联的呢？
+
+且看下图
+
+![cgroup_files](/cgroup/cgroup_files.png)
+
+从上面的图，我们可以得到：
+
+  * cgroup的文件系统结构中，每个目录/文件用kernfs_node结构表示
+  * 每个cgroup由一个目录和多个文件组成，从kernfs_node->priv指向对应的cgroup或cftype
+  * 其中一个文件对应到一个cftype，文件的名字和对应的ops由对应的cftype决定
+  * ops只有两种情况cgroup_kf_ops和cgroup_kf_single_ops，在cgroup_init_cftypes()中设置
