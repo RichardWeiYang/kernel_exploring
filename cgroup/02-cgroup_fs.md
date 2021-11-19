@@ -383,3 +383,28 @@ cgroup_mkdir()
                                     |             |
                                     +-------------+
 ```
+
+### kernfs_file_ops
+
+因为cgroup的文件系统建立在kernfs基础上，所以对文件的读写操作实际上先要经过kernfs这一道。也就是要经过kernfs_file_ops中定义的操作。
+
+```
+const struct file_operations kernfs_file_fops = {
+	.mmap		= kernfs_fop_mmap,
+  .write_iter	= kernfs_fop_write_iter,
+	.open		= kernfs_fop_open,
+};
+```
+
+这些函数中又一个重要的helper， kernfs_ops：
+
+```
+static const struct kernfs_ops *kernfs_ops(struct kernfs_node *kn)
+{
+	if (kn->flags & KERNFS_LOCKDEP)
+		lockdep_assert_held(kn);
+	return kn->attr.ops;
+}
+```
+
+看到这个kn->attr.ops了么？对cgroup的文件来说， ops就是cgroup_kf[_single]_ops。所以对cgroup文件的open/write，实际上就走到了cgroup_file_open/cgroup_file_write。
