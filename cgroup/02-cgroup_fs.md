@@ -318,3 +318,68 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
   * 每个cgroup由一个目录和多个文件组成，从kernfs_node->priv指向对应的cgroup或cftype
   * 其中一个文件对应到一个cftype，文件的名字和对应的ops由对应的cftype决定
   * ops只有两种情况cgroup_kf_ops和cgroup_kf_single_ops，在cgroup_init_cftypes()中设置
+
+# 如何通过文件配置cgroup
+
+终于我们走到了正题。本节我们说了这么多就是为了研究在上一节中配置cgroup的方法究竟是如何生效的。在了解了cgroup的文件系统之后，我们终于可以来解答这个问题了。
+
+上一节的例子中，配置cgroup分为三步：
+
+  * 通过新建目录新建一个cgroup
+  * 在cgroup.procs写入进程号
+  * 根据不同的cgroup再做详细配置
+
+其中第三步因cgroup的不同而不同，前两步对所有的都适用。在这里我们只看前两步，最后一步到时机成熟时再来看。
+
+## 通过新建目录来新建cgroup
+
+新建目录是通过mkdir实现的，这个好像前面没有提及？是的，在图cgroup_files中，我们隐藏了一个没有涉及的细节。kf_root中有个成员syscall_ops，分别可以被赋值为cgroup_kf_syscall_ops 和 cgroup1_kf_syscall_ops。
+
+当我们打开这两个结构体一看：
+
+```
++-----------------------+
+|mkdir                  |  = cgroup_mkdir
+|rmdir                  |  = cgroup_rmdir
+|show_path              |  = cgroup_show_path
+|show_options           |  = cgroup_show_options
++-----------------------+
+```
+
+我想你也猜到这些函数是干什么的了。
+
+再来看一眼cgroup_mkdir吧
+
+```
+cgroup_mkdir()
+  cgrp = cgroup_create(parent, name, mode)
+  ret = css_populate_dir(&cgrp->self)
+  ret = cgroup_apply_control_enable(cgrp)
+  kernfs_activate(cgrp->kn)
+```
+
+我想，聪明如你，此时也不需要我多说什么了。
+
+## cgroup.procs来添加进程
+
+创建了cgroup后，第二步就是把进程移动到这个cgroup中。在上一节的例子中，我们是通过将进程号写入cgroup.procs文件来实现的。那就来看看这究竟是如何做到的吧。
+
+在图cgroup_files中我们看到一个文件对应的一个kernfs_node结构体，
+
+```
+                                    cgroup1_base_files["cgroup.procs"]
+                                +-->+-------------+
+  kernfs_node                   |   |             |
+  +------------------------+    |   |write        | = cgropu1_procs_write
+  |parent                  |    |   |             |
+  |   (struct kernfs_root*)|    |   |             |
+  |priv                    |----+   +-------------+
+  |   (void *)             |
+  |                        |        cgroup_kf[_single]_ops
+  |attr.ops                |------->+-------------+    
+  |   (struct kernfs_ops *)|        |open         | = cgroup_file_open
+  +------------------------+        |write        | = cgroup_file_write
+                                    |poll         |
+                                    |             |
+                                    +-------------+
+```
