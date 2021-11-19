@@ -370,7 +370,7 @@ cgroup_mkdir()
                                     cgroup1_base_files["cgroup.procs"]
                                 +-->+-------------+
   kernfs_node                   |   |             |
-  +------------------------+    |   |write        | = cgropu1_procs_write
+  +------------------------+    |   |write        | = cgroup1_procs_write
   |parent                  |    |   |             |
   |   (struct kernfs_root*)|    |   |             |
   |priv                    |----+   +-------------+
@@ -408,3 +408,24 @@ static const struct kernfs_ops *kernfs_ops(struct kernfs_node *kn)
 ```
 
 看到这个kn->attr.ops了么？对cgroup的文件来说， ops就是cgroup_kf[_single]_ops。所以对cgroup文件的open/write，实际上就走到了cgroup_file_open/cgroup_file_write。
+
+### cgroup_file_open/cgroup_file_write -> cft
+
+其实看到了上面这点，到这里就不难了。
+
+cgroup_file_open/write分别调用了对应cft的open/write。
+
+对cgroup.procs文件来说，这个写操作最后落到了__cgroup1_procs_write。
+
+```
+__cgroup1_procs_write()
+  task = cgroup_procs_write_start(buf, threadgroup, &locked);
+  ret = cgroup_attach_task(cgrp, task, threadgroup);
+	cgroup_procs_write_finish(task, locked);
+```
+
+简单来讲就是做了上面三件事情。
+
+好了，到这里我们至少把用户是如何通过cgroup文件系统配置cgroup的过程了解明白了。至于具体进程是如何加入到一个cgroup的已经超出了本节要讨论的内容。
+
+了解了这么多，先让自己休息一下吧。
