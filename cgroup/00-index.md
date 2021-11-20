@@ -14,8 +14,49 @@ cgroup是计算机资源管理常用的管理设施，尤其是在云计算环�
 
 # cgroup树形结构
 
+从用户使用的角度看过了cgroup后，终于是时候揭开cgroup真实的面纱了。
+
+在开始之前，我们先来好好看看cgroup的定义。来个借花献佛，我搬运一下[内核文档][3]
+
+```
+Control Groups provide a mechanism for aggregating/partitioning sets of
+tasks, and all their future children, into hierarchical groups with
+specialized behaviour.
+
+Definitions:
+
+A *cgroup* associates a set of tasks with a set of parameters for one
+or more subsystems.
+
+A *subsystem* is a module that makes use of the task grouping
+facilities provided by cgroups to treat groups of tasks in
+particular ways. A subsystem is typically a "resource controller" that
+schedules a resource or applies per-cgroup limits, but it may be
+anything that wants to act on a group of processes, e.g. a
+virtualization subsystem.
+
+A *hierarchy* is a set of cgroups arranged in a tree, such that
+every task in the system is in exactly one of the cgroups in the
+hierarchy, and a set of subsystems; each subsystem has system-specific
+state attached to each cgroup in the hierarchy.  Each hierarchy has
+an instance of the cgroup virtual filesystem associated with it.
+```
+
+从上面的描述中可以看到cgroup有两个重要的概念：
+
+  * 层次结构
+  * 子系统
+
+层次结构是对系统中进程的切分，而子系统则赋予了cgroup在不同层面对进程的切变控制的方法。
+
+每个子系统对系统的控制有着不同的方式，所以在本章我们主要讲述[cgroup的树形结构][4]。
+
+虽然会涉及到一些子系统的内容，但其其中具体的精妙细节将留给各个子系统描述。
+
 # cgropu和进程
 
 
 [1]: /cgroup/01-control_cpu_mem_by_cgroup.md
 [2]: /cgroup/02-cgroup_fs.md
+[3]: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/cgroups.html
+[4]: /cgroup/03-hierarchy.md
