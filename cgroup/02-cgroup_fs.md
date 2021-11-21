@@ -429,3 +429,13 @@ __cgroup1_procs_write()
 好了，到这里我们至少把用户是如何通过cgroup文件系统配置cgroup的过程了解明白了。至于具体进程是如何加入到一个cgroup的已经超出了本节要讨论的内容。
 
 了解了这么多，先让自己休息一下吧。
+
+# 常见文件
+
+## /proc/cgroups
+
+函数proc_cgroupstats_show()
+
+## /proc/self/cgroup
+
+函数proc_cgroup_show()
