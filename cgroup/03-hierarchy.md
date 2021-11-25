@@ -148,3 +148,67 @@ start_kernel()
   * 初始化每个配置了的subsystem
 
 因为cgroup文件系统相关内容我们已经在上一节中详细阐述，所以接下来我们就看看cgroup_root和subsystem的初始化。
+
+# cgroup_root的初始化
+
+和cgroup_root初始化相关的有两个地方
+
+  * init_cgroup_root()
+  * cgroup_setup_root()
+
+在上一节中我们看到过cgroup_root结构体，但我们着重看了和cgroup文件系统相关的部分。现在我们来看一下这个结构体的全貌。
+
+```
+cgroup_roots(struct list_head)
+  |
+  |       cgroup_root(cgrp_dfl_root)
+  |       +-------------------------------+<----+
+  +------>|root_list                      |     |
+          |    (struct list_head)         |     |
+          |name[]                         |     |
+          |    (char)                     |     |
+          |hierarchy_id                   |     |
+          |    (int)                      |     |
+          |                               |     |
+          |cgrp                           |     |
+          |    (struct cgroup)            |     |
+          |    +--------------------------+<----|--------------------------+
+          |    |root                   ---|-----+                          |
+          |    |   (struct cgroup_root*)  |                                |
+          |    |                          |                                |
+          |    |kn                        |  = kf_root->kn                 |
+          |    |    (struct kernfs_node *)|-----+                          |
+          |    +--------------------------+     |                          |
+          |kf_root                        |     |                          |
+          |    (struct kernfs_root*)      |     |                          |
+          |    +--------------------------+     |                          |
+          |    |kn                        |     |                          |
+          |    |  (struct kernfs_node*)   |     |                          |
+          |    |  +-----------------------+<----+                          |
+          |    |  |priv                   |--------------------------------+
+          |    |  |  (void *)             |  = cgrp_dfl_root.cgrp
+          |    +--+-----------------------+
+          |    |syscall_ops               |  = cgroup_kf_syscall_ops | cgroup1_kf_syscall_ops
+          |    |  (struct kernfs_syscall*)|
+          |    |  +-----------------------+
+          |    |  |mkdir                  |  = cgroup_mkdir
+          |    |  |rmdir                  |  = cgroup_rmdir
+          |    |  |show_path              |  = cgroup_show_path
+          |    |  |show_options           |  = cgroup_show_options
+          |    |  +-----------------------+
+          |    +--------------------------+
+          |                               |
+          |subsys_mask                    |  bitmask of subsys attached
+          |    (unsigned int)             |  set in cgroup_init() for cgrp_dfl_root
+          |                               |      in rebind_subsystems() for others
+          |nr_cgrps                       |
+          |    (atomic_t)                 |
+          +-------------------------------+
+```
+
+从结构体的定义上可以看出，cgroup_root主要包含了：
+
+  * 一个根cgroup
+  * 一个kernfs文件系统的根结构
+
+而cgroup_root的初始化主要是准备好这两个结构体，也就是设置好了cgroup文件系统目录结构并关联到了某个cgroup树形结构的根上。
