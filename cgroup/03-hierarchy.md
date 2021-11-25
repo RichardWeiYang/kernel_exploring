@@ -109,3 +109,42 @@ struct cgroup_subsys *cgroup_subsys[] = {
 ```
 
 ok,这样当内核中出现这些变量的时候，你就知道都对应到是谁，要去哪里找他们了吧。
+
+# cgroup初始化概览
+
+终于要揭开cgroup的面纱了，我们先来看cgroup是在什么地方初始化的，以及初始化大致都做了些什么工作。
+
+```
+start_kernel()
+    cgroup_init_early()
+        init_cgroup_root(&ctx)
+            init_cgroup_housekeeping(cgrp)
+        for_each_subsys(ss, i) {
+            if (ss->early_init)
+                cgroup_init_subsys(ss)
+        }
+    cgroup_init()
+        cgroup_init_cftypes(NULL, cgroup_base_files)
+        cgroup_init_cftypes(NULL, cgroup1_base_files)
+        cgroup_setup_root(&cgrp_dfl_root, 0)
+        for_each_subsys(ss, ssid) {
+            if (!ss->early_init)
+                cgroup_init_subsys(ss)
+            cgroup_add_dfl_cftypes(ss, ss->dfl_cftypes)
+            cgroup_add_legacy_cftypes(ss, ss->legacy_cftypes)
+            if (ss->bind)
+                ss->bind(init_css_set.subsys[ssid])
+            css_populate_dir(init_css_set.subsys[ssid])
+        }
+        sysfs_create_mount_point(fs_kobj, "cgroup")
+        register_filesystem(&cgroup_fs_type)
+        register_filesystem(&cgroup2_fs_type)
+```
+
+从上面摘出的代码来看，初始化cgroup主要做了这么几件事：
+
+  * 注册cgroup文件系统，及初始化对应的cft
+  * 初始化cgroup_root
+  * 初始化每个配置了的subsystem
+
+因为cgroup文件系统相关内容我们已经在上一节中详细阐述，所以接下来我们就看看cgroup_root和subsystem的初始化。
