@@ -212,3 +212,192 @@ cgroup_roots(struct list_head)
   * 一个kernfs文件系统的根结构
 
 而cgroup_root的初始化主要是准备好这两个结构体，也就是设置好了cgroup文件系统目录结构并关联到了某个cgroup树形结构的根上。
+
+# subsystem的初始化
+
+先来看一下subsystem初始化都做了哪些事儿。
+
+```
+cgroup_init_subsys(ss, early)
+    ss->root = &cgrp_dfl_root
+    css = ss->css_alloc()
+    init_and_link_css(css, ss, &cgrp_dfl_root.cgrp)
+        css->cgroup = cgrp
+        css->ss = ss
+    init_css_set.subsys[ss->id] = css
+    online_css(css)
+        ss->css_online(css)
+        css->cgroup->subsys[ss->id] = css
+```
+
+嗯，看上去简直就是天书，完全不知道是在干啥。ok，让我来拆解一下。这段代码中涉及到四个数据结构：
+
+  * cgroup_root
+  * cgroup
+  * cgroup_subsys
+  * cgroup_subsys_state
+
+而这个函数要做的事儿，就是把这四个结构体关联起来。那就让我们慢慢讲来：
+
+## cgroup_subsys的模样
+
+```
+cgroup_subsys
++-------------------------------+<----------------------------------------+
+|name                           |                                         |
+|legacy_name                    |                                         |
+|    (char *)                   |                                         |
+|id                             |                                         |
+|    (int)                      |                                         |
+|                               |                                         |
+|root                           |  = &cgrp_dfl_root                       |
+|    (struct cgroup_root*)      |    init in cgroup_init_subsys()         |
+|                               |    rebind in rebind_subsystems()        |
+|                               |                                         |
+|dfl_cftypes                    |  be populated by css_populate_dir()     |
+|legacy_cftypes                 |                                         |
+|    (struct cftype*)           |                                         |
+|                               |    dfl_cftypes       legacy_cftypes     |
+|                               |    +------------+    +------------+     |
+|cfts                        ---|--->|node     ---|--->|node        |     |
+|    (struct list_head)         |    |ss          |    |ss       ---|-----+
+|                               |    |kf_ops      |    |kf_ops      |
+|                               |    +------------+    +------------+    
++-------------------------------+
+```
+
+从这个图上看，subsys只和cgroup_root之前存在联系，而且只和一个cgroup_root有关。这也解释了系统中对某一个subsys的系统划分只能有一种。
+
+另外我们也看到了，某个subsys自带的配置文件是关联在subsys上的。由函数cgroup_add_legacy_cftypes/cgroup_add_dfl_cftypes在cgroup_init()时添加到了ss->cfts链表。
+
+## cgroup和cgroup_subsys_state
+
+```
+cgroup
++--------------------------------------+<--------------------------+
+|subsys[CGROUP_SUBSYS_COUNT]           |                           |
+|    (struct cgroup_subsys_state*)     |                           |
+|    [0]  +----------------------------+                           |
+|         |cgroup                      |---------------------------+
+|         |   (struct cgroup*)         |                           |
+|         |ss                          |  = cgroup_subsys[0]       |
+|         |   (struct cgroup_subsys*)  |                           |
+|    [1]  +----------------------------+                           |
+|         |cgroup                      |---------------------------+
+|         |   (struct cgroup*)         |                           |
+|         |ss                          |  = cgroup_subsys[1]       |
+|         |   (struct cgroup_subsys*)  |                           |
+|    [2]  +----------------------------+                           |
+|         |                            |                           |
+|         .                            .                           |
+|         .                            .                           |
+|         |                            |                           |
+|    [15] +----------------------------+                           |
+|         |cgroup                      |---------------------------+
+|         |   (struct cgroup*)         |
+|         |ss                          |  = cgroup_subsys[15]
+|         |   (struct cgroup_subsys*)  |
+|         |                            |
++---------+----------------------------+
+```
+
+cgroup上有一个长度为CGROUP_SUBSYS_COUNT的数组， subsys[]。其中每一个成员都指向了一个cgroup_subsys_state结构。
+
+从这个结构上可以看出：
+
+  * 每个cgroup可以关联所有的subsys
+  * 如果对应的成员为NULL，表示该cgroup没有和对应的subsys绑定
+  * 也可以看到每个subsys_state都有指向自己是属于哪个subsys的指针
+
+## cgroup_subsys的层次结构
+
+```
+                     cgroup
+                     +--------------------------------------+
+                     |subsys[id]                        ^   |
+                     |    (struct cgroup_subsys_state*) |   |
+                     |    +---------------------------------+
+                     |    |cgroup                    ---+   |
+                     |    |    (struct cgroup*)             |
+                     |    |ss                               |
+                     |    |    (struct cgroup_subsys*)      |  = non-NULL
+                     |    |                                 |
+                     |    |parent                           |
+                     |    |    (struct cgroup_subsys_state*)|
+                     |    |                                 |
+                     |    |children                ||       |
+                     |    |    (struct list_head)  ||       |
+                     +----+---------------------------------+ <--------------------------------------+
+                                              ^    ||                                                |
+       	                                      |    ||                                                |
+                                              |    ||                                                |
+                                              |    ||                                                |
+                                              |    ||                                                |
+    cgroup                                    |    ||      cgroup                                    |
+    +--------------------------------------+  |    ||      +--------------------------------------+  |
+    |subsys[id]                        ^   |  |    ||      |subsys[id]                        ^   |  |
+    |    (struct cgroup_subsys_state*) |   |  |    ||      |    (struct cgroup_subsys_state*) |   |  |
+    |    +---------------------------------+  |    ||      |    +---------------------------------+  |
+    |    |cgroup                    ---+   |  |    ||      |    |cgroup                    ---+   |  |
+    |    |    (struct cgroup*)             |  |    ||      |    |    (struct cgroup*)             |  |
+    |    |                                 |  |    ||      |    |                                 |  |
+    |    |parent                        ---|--+    ||      |    |parent                        ---|--+
+    |    |    (struct cgroup_subsys_state*)|       ||      |    |    (struct cgroup_subsys_state*)|
+    |    |                                 |       ||      |    |                                 |
+    |    |sibling                      ====|=======++======|====|sibling                          |
+    |    |    (struct list_head)           |               |    |    (struct list_head)           |
+    +----+---------------------------------+               +----+---------------------------------+
+```
+
+实际上这个工作主要是在css_create()函数中做到的，但是因为这个确实比较重要，我就把他放在了这里。
+
+怎么样，现在是不是有点感觉了？我们已经在subsys_state的角度形成了一个层次结构。这是不是已经很像我们用mkdir创建cgroup时形成的层次结构？
+
+## 隐藏的cgroup_subsys_state
+
+最后要放一张神奇的图：
+
+```
+                     cgroup
+                     +--------------------------------------+
+                     |self                              ^   |
+                     |    (struct cgroup_subsys_state)  |   |
+                     |    +---------------------------------+
+                     |    |cgroup                    ---+   |
+                     |    |    (struct cgroup*)             |
+                     |    |ss                               |
+                     |    |    (struct cgroup_subsys*)      |  = NULL
+                     |    |parent                           |
+                     |    |    (struct cgroup_subsys_state*)|
+                     |    |                                 |
+                     |    |children                ||       |
+                     |    |    (struct list_head)  ||       |
+                     +----+---------------------------------+ <--------------------------------------+
+                                              ^    ||                                                |
+       	                                      |    ||                                                |
+                                              |    ||                                                |
+                                              |    ||                                                |
+                                              |    ||                                                |
+    cgroup                                    |    ||      cgroup                                    |
+    +--------------------------------------+  |    ||      +--------------------------------------+  |
+    |self                              ^   |  |    ||      |self                              ^   |  |
+    |    (struct cgroup_subsys_state)  |   |  |    ||      |    (struct cgroup_subsys_state)  |   |  |
+    |    +---------------------------------+  |    ||      |    +---------------------------------+  |
+    |    |cgroup                    ---+   |  |    ||      |    |cgroup                    ---+   |  |
+    |    |    (struct cgroup*)             |  |    ||      |    |    (struct cgroup*)             |  |
+    |    |                                 |  |    ||      |    |                                 |  |
+    |    |parent                        ---|--+    ||      |    |parent                        ---|--+
+    |    |    (struct cgroup_subsys_state*)|       ||      |    |    (struct cgroup_subsys_state*)|
+    |    |                                 |       ||      |    |                                 |
+    |    |sibling                      ====|=======++======|====|sibling                          |
+    |    |    (struct list_head)           |               |    |    (struct list_head)           |
+    +----+---------------------------------+               +----+---------------------------------+
+```
+
+这张图是不是和上面那张很像？几乎一模一样？
+
+是的，唯一的区别在于这次链接起来的是cgroup->self，而不是cgroup->subsys[]。
+
+这个问题我也没有想明白，为啥还要单独用一个隐藏的subsys_state来链接？为啥不直接用cgroup来链接？我能想到的解释是遗留问题。可能最开始没有想到要加这么多subsys。
+
+好了，cgroup的层次结构就这么突然的呈现在你的面前，没有什么明显的征兆。就好像生活中某些事儿突如其来又戛然而止。
