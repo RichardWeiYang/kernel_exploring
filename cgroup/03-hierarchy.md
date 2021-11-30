@@ -401,3 +401,93 @@ cgroup上有一个长度为CGROUP_SUBSYS_COUNT的数组， subsys[]。其中每�
 这个问题我也没有想明白，为啥还要单独用一个隐藏的subsys_state来链接？为啥不直接用cgroup来链接？我能想到的解释是遗留问题。可能最开始没有想到要加这么多subsys。
 
 好了，cgroup的层次结构就这么突然的呈现在你的面前，没有什么明显的征兆。就好像生活中某些事儿突如其来又戛然而止。
+
+# 相关函数
+
+对整个结构有了全貌后，我们对一些常用的函数做一些了解。这样可以加深对整个结构的了解，同时也可以验证我们之前的认识是否正确。
+
+我们将看一些比较常用的函数，如：
+
+  * 遍历层次结构
+  * cgoup创建
+  * css创建
+
+## 遍历层次结构
+
+既然我们构建了一个cgroup的层次结构，那么必然需要遍历这个结构。内核中提供了三个帮助我们遍历的函数：
+
+  * cgroup_for_each_live_child()
+  * cgroup_for_each_live_descendant_pre()
+  * cgroup_for_each_live_descendant_post()
+
+这三个都是宏定义，且不长。我们就都打开看一下。
+
+```
+/* iterate over child cgrps, lock should be held throughout iteration */
+#define cgroup_for_each_live_child(child, cgrp)				\
+	list_for_each_entry((child), &(cgrp)->self.children, self.sibling) \
+		if (({ lockdep_assert_held(&cgroup_mutex);		\
+		       cgroup_is_dead(child); }))			\
+			;						\
+		else
+
+/* walk live descendants in pre order */
+#define cgroup_for_each_live_descendant_pre(dsct, d_css, cgrp)		\
+	css_for_each_descendant_pre((d_css), &(cgrp)->self)		\
+		if (({ lockdep_assert_held(&cgroup_mutex);		\
+		       (dsct) = (d_css)->cgroup;			\
+		       cgroup_is_dead(dsct); }))			\
+			;						\
+		else
+
+/* walk live descendants in postorder */
+#define cgroup_for_each_live_descendant_post(dsct, d_css, cgrp)		\
+	css_for_each_descendant_post((d_css), &(cgrp)->self)		\
+		if (({ lockdep_assert_held(&cgroup_mutex);		\
+		       (dsct) = (d_css)->cgroup;			\
+		       cgroup_is_dead(dsct); }))			\
+			;						\
+		else
+```
+
+可以看到，第一个遍历其实就是遍历了cgrp->self.children这个链表。也就这一个层次，遍历是比较简单的。
+
+而后两者是遍历整个子树了，所以一眼看不清楚具体做了啥。但是都调用了一个非常像的函数css_for_each_descendant_[pre|post]。
+
+让我们来看看其中一个的实现。
+
+```
+#define css_for_each_descendant_pre(pos, css)				\
+	for ((pos) = css_next_descendant_pre(NULL, (css)); (pos);	\
+	     (pos) = css_next_descendant_pre((pos), (css)))
+
+struct cgroup_subsys_state *
+css_next_descendant_pre(struct cgroup_subsys_state *pos,
+			struct cgroup_subsys_state *root)
+{
+	struct cgroup_subsys_state *next;
+
+	cgroup_assert_mutex_or_rcu_locked();
+
+	/* if first iteration, visit @root */
+	if (!pos)
+		return root;
+
+	/* visit the first child if exists */
+	next = css_next_child(NULL, pos);
+	if (next)
+		return next;
+
+	/* no child, visit my or the closest ancestor's next sibling */
+	while (pos != root) {
+		next = css_next_child(pos, pos->parent);
+		if (next)
+			return next;
+		pos = pos->parent;
+	}
+
+	return NULL;
+}
+```
+
+其中css_next_child()只是寻找parent下pos后面一个孩子，如果都找到了，则网上一层。这样配合起来就完成了子树的遍历。
