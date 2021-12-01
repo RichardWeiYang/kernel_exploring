@@ -409,8 +409,8 @@ cgroup上有一个长度为CGROUP_SUBSYS_COUNT的数组， subsys[]。其中每�
 我们将看一些比较常用的函数，如：
 
   * 遍历层次结构
-  * cgoup创建
-  * css创建
+  * 创建cgroup
+  * 创建css
 
 ## 遍历层次结构
 
@@ -491,3 +491,71 @@ css_next_descendant_pre(struct cgroup_subsys_state *pos,
 ```
 
 其中css_next_child()只是寻找parent下pos后面一个孩子，如果都找到了，则网上一层。这样配合起来就完成了子树的遍历。
+
+## 创建cgroup
+
+接下来一个重要的函数是创建cgroup的了。
+
+```
+cgroup_create(parent)
+    cgrp = kzalloc()
+    percpu_ref_init(&cgrp->self.refcnt, css_release, 0, GFP_KERNEL);
+    cgroup_rstat_init(cgrp);
+    kn = kernfs_create_dir(parent->kn, name, mode, cgrp)
+    init_cgroup_housekeeping(cgrp)
+    list_add_tail_rcu(&cgrp->self.sibling, &cgroup_parent(cgrp)->self.children);
+    cgroup_propagate_control(cgrp)
+```
+
+这个函数里，创建了一个空的cgroup结构，然后把这个结构体收拾干净。备用。
+
+那给谁用呢？还记得之前看过的cgroup_mkdir么？对了，就是给他用。
+
+```
+cgroup_mkdir()
+  cgrp = cgroup_create(parent, name, mode)
+  ret = css_populate_dir(&cgrp->self)
+  ret = cgroup_apply_control_enable(cgrp)
+  kernfs_activate(cgrp->kn)
+```
+
+扫了一眼，大部分我们已经心中有数了。无非是创建cft文件，并显示。其中只有一个函数我们还不清楚。cgroup_apply_control_enable。
+
+```
+static int cgroup_apply_control_enable(struct cgroup *cgrp)
+{
+	struct cgroup *dsct;
+	struct cgroup_subsys_state *d_css;
+	struct cgroup_subsys *ss;
+	int ssid, ret;
+
+	cgroup_for_each_live_descendant_pre(dsct, d_css, cgrp) {
+		for_each_subsys(ss, ssid) {
+			struct cgroup_subsys_state *css = cgroup_css(dsct, ss);
+
+			if (!(cgroup_ss_mask(dsct) & (1 << ss->id)))
+				continue;
+
+			if (!css) {
+				css = css_create(dsct, ss);
+				if (IS_ERR(css))
+					return PTR_ERR(css);
+			}
+
+			WARN_ON_ONCE(percpu_ref_is_dying(&css->refcnt));
+
+			if (css_visible(css)) {
+				ret = css_populate_dir(css);
+				if (ret)
+					return ret;
+			}
+		}
+	}
+
+	return 0;
+}
+```
+
+遍历cgroup子树的函数cgroup_for_each_live_descendant_pre()我们刚看过，因为这个cgroup是刚创建的，所以这里就遍历了一个节点。而整个函数的目标还是创建对应的cft文件并显示。只不过这里还隐含了一个动作css_create()。是的，之前我们看到的cgroup_subsystem_state就是在这里创建的。
+
+## 创建css
