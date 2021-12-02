@@ -559,3 +559,22 @@ static int cgroup_apply_control_enable(struct cgroup *cgrp)
 遍历cgroup子树的函数cgroup_for_each_live_descendant_pre()我们刚看过，因为这个cgroup是刚创建的，所以这里就遍历了一个节点。而整个函数的目标还是创建对应的cft文件并显示。只不过这里还隐含了一个动作css_create()。是的，之前我们看到的cgroup_subsystem_state就是在这里创建的。
 
 ## 创建css
+
+每个cgroup上enable的每个subsys都有一个对应的subsys_state。这个结构由css_create()创建。
+
+```
+css_create(cgrp, ss)
+    css = ss->css_alloc()
+    init_and_link_css(css, ss, cgrp)
+    list_add_tail_rcu(&css->sibling, &parent_css->children)
+    online_css(css)
+        ss->css_online(css)
+        rcu_assign_pointer(css->cgroup->subsys[ss->id], css)
+```
+
+总的来说，创建一个css做了这么几件事：
+
+  * 把自己链接到父节点的孩子中
+  * 把自己赋值到cgroup的subsys[]中
+
+好了，到这里，基本上就把cgroup层次结构所涉及到的内容都讲完了。
