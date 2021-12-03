@@ -53,10 +53,21 @@ an instance of the cgroup virtual filesystem associated with it.
 
 虽然会涉及到一些子系统的内容，但其其中具体的精妙细节将留给各个子系统描述。
 
-# cgropu和进程
+# cgroup和进程的关联
 
+接下来我们需要了解的是cgroup和进程的关系。
+
+从上面的定义中，我们看草cgroup联结了计算机系统中的两部分内容：
+
+  * 进程
+  * 系统资源
+
+在上一节中，我们看到了cgroup的subsystem将系统的资源按照层次结构做了切分。（当然具体怎么切的需要看对应的subsystem，cgroup本身只提供了一种层次化结构框架。）那接下来就要看看内核是如何把进程和cgroup联系起来的。
+
+[cgroup和进程的关联][5]
 
 [1]: /cgroup/01-control_cpu_mem_by_cgroup.md
 [2]: /cgroup/02-cgroup_fs.md
 [3]: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/cgroups.html
 [4]: /cgroup/03-hierarchy.md
+[5]: /cgroup/04-cgroup_and_process.md
