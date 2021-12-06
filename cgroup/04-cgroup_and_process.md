@@ -173,4 +173,112 @@ css_set动态演化是一个不容易描述的过程，不仅仅是单个css_set
 
 当我第一次理解这种映射关系的时候，我有种震撼的感觉。假如你把cgroup的层次结构想象成一个平面，而css_set在其上的另一个明面。那么任意一个css_set就会有来自所有cgroup_root子树上某一个cgroup的连线。而我们换一个角度思考，一个css_set代表了一个进程的cgroup配置，而每一个css_set对每一个cgroup_root的关联就表示了这个进程在这个cgroup subsystem上的配置。或者说，一个css_set就是所有cgroup的一个快照。
 
+# 进程在cgroup间的移动
+
+上一小节动态演化中，cgroup和进程(css_set)之间的关系可以由函数find_css_set()引导出来。可以分为：
+
+  * 进程创建
+  * 进程移动
+
+进程创建时默认加入到和傅进程同样的cgroup中，所以find_css_set()还是会沿用父进程的css_set()。
+而进程创建则会复杂一些，在可能创建新css_set的同时，也隐藏着更多的技巧和细节。
+
+## 从文件系统接口开始
+
+在第一小节cgroup控制进程中我们就看到了如何增加一个cgroup，并将进程加入到这个cgroup中。这里就是进程在cgroup间移动的入口。
+
+既然已经学过了cgroup文件系统，那就让我们从这里开始吧。
+
+```
+    cgroup.procs, __cgroup1_procs_write()
+        cgrp = cgroup_kn_lock_live(of->kn, false)
+        task = cgroup_procs_write_start(buf, threadgroup, )
+            kstrtoint(strstrip(buf), 0, &pid)
+            tsk = find_task_by_vpid(pid)
+            get_task_struct(tsk)
+        cgroup_attach_task(cgrp, task, threadgroup)
+            cgroup_migrate_add_src(task_css_set(task), cgrp, &mgctx)
+            cgroup_migrate_prepare_dst()
+            cgroup_migrate(leader, threadgroup, )
+                cgroup_migrate_add_task(task, mgctx)
+                cgroup_migrate_execute(mgctx)
+            cgroup_migrate_finish(&mgctx)
+        cgroup_procs_write_finish(task, locked)
+            put_task_struct(task)
+            ss->post_attach()
+```
+
+上面这个函数__cgroup1_procs_write()就是当我们写入一个pid后，cgroup系统会做的事儿。主要来讲分成三块：
+
+  * 从pid找到对应的进程
+  * 将进程转移到目标cgroup
+  * 一些清理工作
+
+很明显，和cgroup相关的操作在第二步中。
+
+## 一张图来解释
+
+cgroup_attach_task()这个函数的工作我尝试用一张图来解释：
+
+```
+                                      cgroup_root1
+                                      +-----------+
+                                      |           |
+                                      +-----------+
+                                         /    \
+                                       /        \
+                                     /            \
+                              +-----------+   +-----------+
+                              |cgrp1      |   |cgrp2      |
+                              +-----------+   +-----------+
+                                     ^           ^
+                                     |           |
+     task                            +----+      |
+     +--------+                           |      |
+     |cgroups |--->src_cset               |      |          dst_cset            
+     +--------+    +------------------+   |      |     +--->+------------------+
+                   |mg_src_cgrp    ---|---+      |     |    |mg_src_cgrp       |
+                   |mg_dst_cgrp    ---|----------+     |    |mg_dst_cgrp       |
+                   |  (struct cgroup*)|                |    |  (struct cgroup*)|
+                   |                  |                |    |                  |
+                   |mg_dst_cset    ---|----------------+    |mg_dst_cset       |
+                   | (struct css_set*)|                     | (struct css_set*)|
+                   |                  |                     |                  |
+                   |mg_tasks          | .. move tasks to..> |tasks             |
+                   |                  |                     |                  |
+                   |mg_preload_node + |                     |mg_preload_node + |
+                   |                . |                     |                . |
+                   |mg_node   +     . |                     |mg_node  +      . |
+                   +------------------+                     +------------------+
+                              *     .                                 *      .
+                              *     .                                 *      .
+    cgroup_mgctx              *     .                                 *      .
+    +-----------------------+ *     .                                 *      .
+    |                       | *     .                                 *      .
+    |preloaded_src_csets    |=========                                *      .
+    |preloaded_dst_csets    |==================================================
+    |    (struct list_head) | *                                       *
+    |                       | *                                       *
+    |                       | *                                       *
+    |tset                   | *                                       *
+    |    (cgroup_taskset)   | *                                       *
+    |    +------------------+ *                                       *
+    |    |src_csets         |=====                                    *
+    |    |dst_csets         |==================================================
+    |    |(struct list_head)|
+    +----+------------------+
+```
+
+  * 函数的目的是将task->cgroups从src_cset设置到dst_cset
+  * mg_src_cgrp/mg_dst_cgrp分别记录了所要移动的源和目的cgroup
+  * mg_dst_cset保存了task将要被移动到的css_set
+  * task也将从src_cset->mg_tasks链表移动到dst_cset->tasks链表
+
+这个函数不仅可以移动一个task，还能移动一个threadgroup。在这个情况下：
+
+  * 那么将会把多个task->cgroups从各自的src_cset设置到给自的dst_cset
+  * cgroup_mgctx是一个辅助结构，用来保存所有将会涉及到的css_set
+  * 其中preloaded_src_csets/preloaded_dst_csets用于保存涉及到的源/目的css_set
+  * tset用来给真实迁移task时使用
+
 [1]: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/cgroups.html
