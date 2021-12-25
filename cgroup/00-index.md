@@ -57,7 +57,7 @@ an instance of the cgroup virtual filesystem associated with it.
 
 接下来我们需要了解的是cgroup和进程的关系。
 
-从上面的定义中，我们看草cgroup联结了计算机系统中的两部分内容：
+从上面的定义中，我们看到cgroup联结了计算机系统中的两部分内容：
 
   * 进程
   * 系统资源
@@ -66,8 +66,15 @@ an instance of the cgroup virtual filesystem associated with it.
 
 [cgroup和进程的关联][5]
 
+# cgroup数据统计
+
+最后一个有意思的部分就是cgroup上如果做数据同步。当整个cgroup树变得庞大后，如何有效将子cgroup的信息同步收集到父cgroup，来保证cgroup能有效控制资源，这是一个非常有意思的问题。
+
+[cgroup数据统计][6]
+
 [1]: /cgroup/01-control_cpu_mem_by_cgroup.md
 [2]: /cgroup/02-cgroup_fs.md
 [3]: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/cgroups.html
 [4]: /cgroup/03-hierarchy.md
 [5]: /cgroup/04-cgroup_and_process.md
+[6]: /cgroup/05-statistics.md

@@ -97,3 +97,4 @@
     * [cgroup文件系统](cgroup/02-cgroup_fs.md)
     * [cgroup层次结构](cgroup/03-hierarchy.md)
     * [cgroup和进程的关联](cgroup/04-cgroup_and_process.md)
+    * [cgroup数据统计](cgroup/05-statistics.md)
