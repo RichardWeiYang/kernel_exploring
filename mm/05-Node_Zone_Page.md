@@ -181,6 +181,105 @@ index 35dcf33..f974112 100644
 
 好了，这次就先到这里，希望能给到你一点帮助～
 
+# zonelist 分配内存的顺序
+
+其实我有点纠结，这部分内容要放在哪里。放在这，因为正好讲了node和zone的关系。但是内存分配的内容是在下一节涉及，所以放在这里又感觉有点早。
+
+暂且先放在这里吧，以后哪天觉得不合适了，我再来调整。
+
+内存按照Node/Zone划分的目的最终还是要为分配/回收服务。毕竟内存是有限的，所以分配时有一个需求就是按照什么样的顺序从node/zone上去分配内存。zonelist就是这样一个按照zone顺序排好的链表。在分配的时候，如果某个zone找不到可用内存，就按照zonelist上的顺序挨个寻找。
+
+OK，好像一句话就说完了。还是亲眼渐渐zonelist的模样吧。
+
+```
+   node_data[]
+   +-----------------------------+
+   |node_zonelists[MAX_ZONELISTS]|
+   |   (struct zonelist)         |
+   |   +-------------------------+
+   |   |_zonerefs[]              | = MAX_NUMNODES * MAX_NR_ZONES + 1
+   |   | (struct zoneref)        | Node 0:
+   |   |  +----------------------+    [ZONE_NORMAL]        [ZONE_DMA32]         [ZONE_DMA]
+   |   |  |zone                  |    +---------------+    +---------------+    +---------------+
+   |   |  |   (struct zone*)     |    |               |    |               |    |               |
+   |   |  |zone_idx              |    |               |    |               |    |               |
+   |   |  |   (int)              |    +---------------+    +---------------+    +---------------+
+   +---+--+----------------------+
+                                   Node 1:
+
+                                      [ZONE_NORMAL]        [ZONE_DMA32]         [ZONE_DMA]
+                                      +---------------+    +---------------+    +---------------+
+                                      |               |    |               |    |               |
+                                      |               |    |               |    |               |
+                                      +---------------+    +---------------+    +---------------+
+```
+
+所以每个node_data上都有自己的zonelist，用来表示在该numa节点上分配内存时如何按照zone找到空闲内存的顺序。
+
+## 如何做到节点按照round robin排序
+
+commit 54d032ced98378bcb9d32dd5e378b7e402b36ad8 描述了之前内核中的一个bug。在多numa节点情况下，zonelist并没有按照round robin的顺序排列，从而导致了内存访问差异。我们来看下原因。
+
+假设有一个4个numa节点的机器，节点之间的distance如下。
+
+```
+Node 0  1  2  3
+----------------
+0    10 12 32 32
+1    12 10 32 32
+2    32 32 10 12
+3    32 32 12 10
+```
+
+在改动前，每个节点的zonelist上nume节点顺序如下：
+
+```
+Node  Fallback list
+---------------------
+0     0 1 2 3
+1     1 0 3 2
+2     2 3 0 1
+3     3 2 0 1 <-- Unexpected fallback order
+```
+
+可以看到在numa节点2/3上的zonelist顺序是一样的。这样导致在2/3节点上访问远端内存时都先从0上分配。
+
+这样会有两个问题：
+
+  * 软件层面，对0上pgdat/zone/page的访问增加，竞争增加
+  * 硬件层面，内存带宽可能打满
+
+所以期望的情况每个节点的zonelist上numa节点顺序如下：
+
+```
+Node Fallback list
+------------------
+0    0 1 2 3
+1    1 0 3 2
+2    2 3 0 1
+3    3 2 1 0
+```
+
+可以看出，zonelist的顺序是按照distance排序的，且如果distance相等时，会有round robin的计算。
+
+要做到这点，代码中只做了这么一个改动。
+
+```
+-                       node_load[node] = load;
++                       node_load[node] += load;
+```
+
+这样就可以把之前找出来过的节点放到列表的后面了。
+
+## 遍历zonelist
+
+既然讲到了zonelist的构建，就顺便看一下遍历吧。
+
+遍历zonelist主要是在__alloc_pages()函数，目的就是为了按照顺序找到有空闲内存的zone进行分配：
+
+  * preferred_zoneref = first_zones_zonelist()
+  * for_next_zone_zonelist_nodemask()
+
 # 思考题
 
 每个page作为链表元素链接在了free_list上，那page数据结构本身放在哪里呢？你猜的到吗？
