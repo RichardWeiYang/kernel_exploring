@@ -82,16 +82,17 @@ hot-online就是要把内存放到buddy system，让内核管理起这部分内�
                        __free_pages_core()                --- (2)
                  online_mem_sections()
            shuffle_zone(zone)
-           build_all_zonelists(NULL)
+           build_all_zonelists(NULL)                      --- (3)
            init_per_zone_wmark_min()
            kswapd_run(nid)
            kcompactd_run(nid)
            writeback_set_ratelimit()
 ```
 
-两个重要的步骤：
+几个重要的步骤：
 
 * (1) 初始化page struct
 * (2) 将page加入到buddy system
+* (3) 重新构造所有NODE_DATA上的zonelist
 
 这么看好像也不是很难。当然魔鬼在细节，仔细看还是有不少内容的。
