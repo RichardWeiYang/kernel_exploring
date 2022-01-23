@@ -280,6 +280,24 @@ Node Fallback list
   * preferred_zoneref = first_zones_zonelist()
   * for_next_zone_zonelist_nodemask()
 
+## 无锁更新
+
+自从有了内存热插拔后，zonelist就面临着一个问题：
+
+  * 更新zonelist是否需要持锁
+
+因为在分配页的时候需要遍历zonlist，这就意味着如果持锁更新，就会影响到整个系统的性能。
+
+我查看了一下历史更新，发现这个事情还是挺有意思的。下面是相关的commit：
+
+  * 6811378e7d8b 2006-06-23 [PATCH] wait_table and zonelist initializing for memory hotadd: update zonelists
+  * 4eaf3f64397c 2010-05-25 mem-hotplug: fix potential race while building zonelist for new populated zone
+  * 9d3be21bf9c0 2017-09-06 mm, page_alloc: simplify zonelist initialization
+  * 11cd8638c37f 2017-09-06 mm, page_alloc: remove stop_machine from build_all_zonelists
+  * b93e0f329e24 2017-09-06 mm, memory_hotplug: get rid of zonelists_mutex
+
+从历史记录来看，最开始是有锁的。到现在其实把锁去掉了。
+
 # 思考题
 
 每个page作为链表元素链接在了free_list上，那page数据结构本身放在哪里呢？你猜的到吗？
