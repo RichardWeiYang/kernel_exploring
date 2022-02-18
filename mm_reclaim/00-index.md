@@ -7,6 +7,14 @@
 
 毕竟系统中的内存是有限的，如何能够在有限的资源下服务好更多的进程就需要有**螺蛳壳里做道场**的精神。当然这部分的内容也极其繁杂，暂时只能一点点去完善和补齐。
 
+先放上知乎上看到的内存回收的系列文章
+
+[Linux中的内存回收1][5]
+
+[Linux中的内存回收2][6]
+
+[Linux中的内存调节之watermark][7]
+
 linux内核的设计理念是尽量多使用内存，这样可以最大化系统性能。那什么时候通过什么手段开始回收内存的操作呢？那就是
 
 [水线][4]
@@ -19,3 +27,6 @@ linux内核的设计理念是尽量多使用内存，这样可以最大化系统
 [2]: /virtual_mm/00-index.md
 [3]: /mm_reclaim/01-swapfile.md
 [4]: /mm_reclaim/02-watermark.md
+[5]: https://zhuanlan.zhihu.com/p/70964195
+[6]: https://zhuanlan.zhihu.com/p/72998605
+[7]: https://zhuanlan.zhihu.com/p/73539328
