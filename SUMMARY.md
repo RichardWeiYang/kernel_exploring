@@ -56,6 +56,8 @@
   * [swapfile原理使用和演进](mm_reclaim/01-swapfile.md)
 * [内存隔离](memcg/00-index.md)
   * [memcg初始化](memcg/01-init_overview.md)
+  * [限制memcg大小](memcg/02-set_memcg_limit.md)
+  * [对memcg记账](memcg/03-charge_memcg.md)
 * [中断和异常](interrupt_exception/00-start_from_hardware.md)
     * [从IDT开始](interrupt_exception/01-idt.md)
     * [中断？异常？有什么区别](interrupt_exception/02-difference.md)
