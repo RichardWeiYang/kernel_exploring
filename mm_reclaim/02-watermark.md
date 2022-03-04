@@ -99,6 +99,17 @@ managed  243597    = 951M
 可以看到，对一个1G的zone来讲，高水位也就10M，而每个水位之间间隔1M。
 这么看，要唤醒kswapd，那是内存已经非常紧张的时候了。
 
+## 水线的调整
+
+水线是可以调整的，这样可以让系统保有更多的内存可以使用。方法就是通过上面提到的两个文件
+
+  * /proc/sys/vm/min_free_kbytes
+  * /proc/sys/vm/watermark_scale_factor
+
+前者抬高低水位，后者加大水位之间的间隔。
+
+具体的效果可以从/proc/zoneinfo文件里查看，这里就不做具体展示了。
+
 # lowmem_reserve
 
 除了水线，还有一个概念控制着什么时候进行内存回收 -- lowmem_reserve。准确的来说应该是这是水线的组成部分。
