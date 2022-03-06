@@ -18,4 +18,17 @@ mem_cgroup_write()
 
 这部分确实挺简单的，恭喜你又掌握了一个知识点。
 
+# memory.soft_limit_in_bytes
+
+和zone的水线对应，memcg也有一个“水线”的概念。但是相对来说简单许多，也就是只有一根线。当超过这条线内核就会尝试做内存回收。
+
+```
+mem_cgroup_write()
+    memcg->soft_limit = nr_pages
+```
+
+从代码上看，设置软限制也相对简单的多。
+
+但是这个soft limit的作用点相对较少，而且社区渐渐想要废弃这块的作用。
+
 [1]: /cgroup/01-control_cpu_mem_by_cgroup.md
