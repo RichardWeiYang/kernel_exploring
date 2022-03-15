@@ -23,6 +23,8 @@ linux内核的设计理念是尽量多使用内存，这样可以最大化系统
 
 [swapfile原理使用和演进][3]
 
+[Big Picture][8]
+
 [1]: /mm/00-memory_a_bottom_up_view.md
 [2]: /virtual_mm/00-index.md
 [3]: /mm_reclaim/01-swapfile.md
@@ -30,3 +32,4 @@ linux内核的设计理念是尽量多使用内存，这样可以最大化系统
 [5]: https://zhuanlan.zhihu.com/p/70964195
 [6]: https://zhuanlan.zhihu.com/p/72998605
 [7]: https://zhuanlan.zhihu.com/p/73539328
+[8]: /mm_reclaim/03-big_picture.md

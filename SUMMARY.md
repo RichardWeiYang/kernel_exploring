@@ -54,6 +54,7 @@
 * [内存的回收再利用](mm_reclaim/00-index.md)
   * [水线](mm_reclaim/02-watermark.md)
   * [swapfile原理使用和演进](mm_reclaim/01-swapfile.md)
+  * [Big Picture](mm_reclaim/03-big_picture.md)
 * [内存隔离](memcg/00-index.md)
   * [memcg初始化](memcg/01-init_overview.md)
   * [限制memcg大小](memcg/02-set_memcg_limit.md)
