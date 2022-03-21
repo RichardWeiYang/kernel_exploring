@@ -97,4 +97,46 @@ pageoutrun 0
 memhog 300M
 ```
 
-# 开始和结束
+# 谁唤醒了回收
+
+kswapd作为一个内核线程，没事儿的时候他老人家是在那里睡大觉的。只有在需要的时候，才会被唤醒起来干活。
+那究竟是谁在什么情况下会集齐龙珠，召唤神龙呢？我们可以看到有一个函数叫wakeup_kswapd，这个是专门用来唤醒kswapd的。
+但是这个函数有两个地方被调用，为了确认唤醒kswapd的源头，小编在函数里加了dump_stack()。看看究竟是什么情况会唤醒kswapd老人家。
+
+```
+[   27.185421] Call Trace:
+[   27.185750]  <TASK>
+[   27.186010]  dump_stack_lvl+0x33/0x42
+[   27.186453]  wakeup_kswapd.cold.87+0x5/0x35
+[   27.186952]  wake_all_kswapds+0x53/0xb0
+[   27.187413]  __alloc_pages_slowpath.constprop.136+0xa3f/0xc40
+[   27.188120]  ? get_page_from_freelist+0xe3/0xc60
+[   27.188673]  __alloc_pages+0x30c/0x320
+[   27.189124]  alloc_pages_vma+0x71/0x180
+[   27.189610]  __handle_mm_fault+0x315/0xb60
+[   27.190103]  handle_mm_fault+0xc0/0x290
+[   27.190700]  do_user_addr_fault+0x1d7/0x650
+[   27.191375]  exc_page_fault+0x4b/0x110
+[   27.191886]  ? asm_exc_page_fault+0x8/0x30
+[   27.192447]  asm_exc_page_fault+0x1e/0x30
+```
+
+从上面的Trace中可以看到，这是一路从缺页中断过来的。因为内存分配失败，然后唤醒了kswapd。
+
+## 龙珠
+
+刚才说了，要召唤神龙需要集齐龙珠。在召唤kswapd的过程中也需要符合多个条件。其中一条是ALLOC_KSWAPD。
+
+```
+if (alloc_flags & ALLOC_KSWAPD)
+  wake_all_kswapds(order, gfp_mask, ac);
+```
+
+讲真，这个ALLOC_KSWAPD的标志真的让我一顿好找。总结下来，确认分配时需不需要这个标志由以下一个原因判断：
+
+  * alloc_flags从gfp_flags决定，gfp_to_alloc_flags()函数负责这个翻译
+  * __GFP_KSWAPD_RECLAIM和ALLOC_KSWAPD的定义是一样的
+  * gfp_flags定义中更有多个flag带了__GFP_KSWAPD_RECLAIM，其中基本的两个是__GFP_KSWAPD_RECLAIM和__GFP_RECLAIM
+  * 对于匿名页，__alloc_pages的gfp是GFP_HIGHUSER_MOVABLE， 这个定义的展开包含了__GFP_RECLAIM
+
+所以对于普通的用户内存申请都符合这个条件。
