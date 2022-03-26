@@ -140,3 +140,16 @@ if (alloc_flags & ALLOC_KSWAPD)
   * 对于匿名页，__alloc_pages的gfp是GFP_HIGHUSER_MOVABLE， 这个定义的展开包含了__GFP_RECLAIM
 
 所以对于普通的用户内存申请都符合这个条件。
+
+# 直接回收在哪？
+
+在[Big Picture][1]中我们看到，回收分成两种：直接回收和间接回收。上面我们看到的是间接回收，那直接回收在什么时候会发生呢？
+
+仔细看下来，又一个重要的GFP标志：__GFP_DIRECT_RECLAIM。只有当设置了这个标志时，才会执行直接回收。
+
+对这个标志的检测发生在两个地方：
+
+  * __alloc_pages_slowpath -> can_direct_reclaim
+  * node_reclaim() -> gfpflags_allow_blocking()
+
+[8]: /mm_reclaim/03-big_picture.md
