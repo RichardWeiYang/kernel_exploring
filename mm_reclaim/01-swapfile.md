@@ -351,3 +351,12 @@ Special value in swap_map continuation:
 > 36005bae205d 2017-02-22 mm/swap: allocate swap slots in batches
 
 其实呢这个改进还要个readahead结合起来说。当有预取的时候，我们会一次性从swap中拿出SWAP_BATCH个entry。改进之前，每次拿一个entry，都会拿一次锁再释放。这样对锁的竞争就比较大。而这次的改进则是对SWAP_BATCH个entry只拿一次锁，这样就减少了竞争。
+
+# swappiness控制交换
+
+为了减少匿名页回收对系统性能造成的影响，系统有两个参数调整回收时究竟多少比例回收匿名页。
+
+  * /proc/sys/vm/swappiness
+  * /sys/fs/cgroup/memory/memory.swappiness
+
+而这两个参数在代码中通过mem_cgroup_swappiness()来获取，其功效就是用来计算回收比例。具体的作用我们将在回收部分统一来看。
