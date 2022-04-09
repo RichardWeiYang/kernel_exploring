@@ -119,7 +119,7 @@
                +--------------------------------------------------------------+
 ```
 
-# Flags
+# page->flags
 
 在页结构体众多成员中，flasgs字段在任何用途下都标示了对应页的属性。除此之外内核中还对这个字段做了非常巧（变）妙（态）的布局。
 
@@ -152,9 +152,39 @@
  */
 ```
 
-# 操作
+其中FLAGS部分的定义就在include/linux/page-flags.h文件中，这部分也是在内核代码中用来判断页属性的关键部分。
 
-而具体字段的含义实在太过复杂，大家可以直接查看源代码。其中对字段操作的宏定义总结如下：
+## FLAGS定义
+
+FLAGS是一个按照比特位来定义的属性集合，比如我们可以看一下定义从而大致了解一下这个FLAGS中都有哪些内容。
+
+```
+  enum pageflags {
+  	PG_locked,		/* Page is locked. Don't touch. */
+  	PG_referenced,
+  	PG_uptodate,
+  	PG_dirty,
+  	PG_lru,
+  	PG_active,
+  	PG_workingset,
+    ...
+  }
+```
+
+整个FLAGS的长度为__NR_PAGEFLAGS，并且内核定义又了NR_PAGEFLAGS。这两者的值一致。
+
+并且在page-flags-layout.h中，用下面的代码保证了这些神秘的东西加起来不会放不下。
+
+```
+#if ZONES_WIDTH + SECTIONS_WIDTH + NODES_WIDTH + KASAN_TAG_WIDTH + LAST_CPUPID_WIDTH \
+	> BITS_PER_LONG - NR_PAGEFLAGS
+#error "Not enough bits in page flags"
+#endif
+```
+
+## FLAGS操作
+
+有了定义，接下来就是如何操作。这里就是体现C语言博大精深的时刻了，其中对字段操作的宏定义总结如下：
 
     * PageXXX()
     * SetPageXXX()
