@@ -218,4 +218,10 @@ PS：感觉快不够用了啊
 
 细心的朋友可能已经注意到了，这次改写的是init_level4_pgt，而不是之前的early_level4_pgt了。
 
+# 内核文档
+
+另外内核文档中也有非常详尽的[页表映射关系][1]。
+
 好，可以休息一下了～
+
+[1]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/x86/x86_64/mm.rst
