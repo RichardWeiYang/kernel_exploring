@@ -7,10 +7,15 @@
 链表是软件中常用的数据结构了，虽然没有什么新花头，但是架不住用的多。而且内核中为了自身需求还演化出了新花样。
 
 [双链表][1]
+
 [优先级队列][2]
+
 [哈希表][3]
+
+[Xarray][4]
 
 
 [1]: /data_struct/01-list.md
 [2]: /data_struct/03-plist.md
 [3]: /data_struct/02-hlist.md
+[4]: /data_struct/04-xarray.md
