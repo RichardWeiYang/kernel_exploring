@@ -121,3 +121,16 @@ xas_error():   xa_err(xas->xa_node)
 
 其中我们可以看到，xas->xa_node上赋值的只有这么几种，不是所有entry类型。
 有了这些，在后面代码阅读中，我们将事半功倍。
+
+# 测试
+
+xarray这个数据结构已经是比较复杂的了，所以内核中提供了对应的代码对这部分做测试用来保证代码质量。
+
+运行测试用例的方法是：
+
+```
+sudo yum install userspace-rcu-devel.x86_64
+cd tools/testing/radix-tree
+make
+./xarray
+```
