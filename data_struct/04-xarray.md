@@ -1,5 +1,69 @@
 现在我们来看看xarray这个数据结构。
 
+# 眼见为实
+
+xarray这个数据结构主要由两个结构体
+
+  * xarray
+  * xa_node
+
+其本身并不复杂，但是组合起来究竟是什么样子呢？ 那就让我们来看看当XA_CHUNK_SHIFT = 4时，一个xarray会是什么样子。
+
+```
+xarray->xa_head = xa_node0
+                  +-------------------------------+
+                  |parent   = NULL                |
+                  |shift    = 8                   |
+                  |max_index= (1 << (8 + 4)) - 1  |
+                  |offset                         |
+                  |                               |
+                  |slots[XA_CHUNK_SIZE]           |
+                  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                  |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+                  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                       |                         |
+                       |                         |
+                       v                         v
+       xa_node2                                  xa_node1
+       +-------------------------------+         +-------------------------------+
+       |parent   = xa_node0            |         |parent   = xa_node0            |
+       |shift    = 4                   |         |shift    = 4                   |
+       |max_index= (1 << (4 + 4)) - 1  |         |max_index= (1 << (4 + 4)) - 1  |
+       |offset   = d                   |         |offset   = 0                   |
+       |                               |         |                               |
+       |slots[XA_CHUNK_SIZE]           |         |slots[XA_CHUNK_SIZE]           |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|         |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                                    |                         |
+                                    |                         +--> [0x090, 0x09f]
+                                    v
+                    xa_node3
+                    +-------------------------------+
+                    |parent   = xa_node2            |
+                    |shift    = 0                   |
+                    |max_index= (1 << 4) - 1        |
+                    |offset   = 1                   |
+                    |                               |
+                    |slots[XA_CHUNK_SIZE]           |
+                    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                    |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+                    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                       |                 |
+                       |                 +--> 0xd15
+                       +--> 0xd1e
+```
+
+从上面这个图我们可以看到
+
+  * XA_CHUNK_SIZE表示了一个xa_node可以表示的比特位是多少
+  * offset表示了自己在父节点上的位置
+  * shift表示了自己在数字中表示第几段数字
+
+总的来讲和系统的页表很像。有了这个图像概念在心里，有些函数就相对比较容易理解了。
+
+不过在正式理解某些函数的工作细节之前，我们要看看代码中用来判断状态的辅助工作。因为不理解这些判断，让人觉得无法读懂代码。
+
 # 眼花缭乱的状态判断
 
 在xarray代码中，我们经常可以看到这样的代码
@@ -121,6 +185,225 @@ xas_error():   xa_err(xas->xa_node)
 
 其中我们可以看到，xas->xa_node上赋值的只有这么几种，不是所有entry类型。
 有了这些，在后面代码阅读中，我们将事半功倍。
+
+# 代码分析
+
+此时，我想我们已经准备好了真正理解代码的奥妙了。
+
+## xas_create
+
+在开始的图中，我们看到对每一个index，我们有一个slot对应。而这个slot中，则存放了我们想要存放的内容。
+
+然而这个slot不是凭空出现的，就好像我们先要造好房子才能住进去。这个建造好slot的过程由xas_create函数来完成。
+
+这个函数可以分成两个部分：
+
+  * xas_expand： 扶摇直上
+  * xas_descend：开枝散叶
+
+整个xarray能表示的index范围由这个xarray的层级限制，就好像一栋房子能有多少户房间受到房子楼层的限制。在盖起来之前先要把地基给打好。这个就是xas_expand做的工作。
+
+理论上，打好地基我们可以把整栋房子都盖起来。但是在软件世界，我们为了节约时间，节约成本，我们就只盖起你需要的那一间。这部分的工作由xas_descend来完成。
+
+## xas_store
+
+房子改好了，有了合适的空间，我们就该把想要保存的东西放到指定的空间了。这个工作就交给了xas_store，也可以看到为了确保有足够的空间，xas_store调用了xas_create。
+
+简单来说，xas_store的工作就是找到slot，并将entry赋值给slot。然而实际的代码要复杂得多，原因是xarray还支持一种“指数”存储的方法。
+
+## xa_store_order
+
+这个函数就是实现“指数”存储的方法，说来也简单，就是套了XA_STATE_ORDER的xas_store。既然这是重要差别，那我们就来看看究竟做了什么。
+
+```
+#define __XA_STATE(array, index, shift, sibs)  {	\
+   ...
+
+#define XA_STATE_ORDER(name, array, index, order)		\
+	struct xa_state name = __XA_STATE(array,		\
+			(index >> order) << order,		\
+			order - (order % XA_CHUNK_SHIFT),	\
+			(1U << (order % XA_CHUNK_SHIFT)) - 1)
+```
+
+这个宏，传进去的是index 和 期望的order，然后将其转换为了xarray中的shift和sibs。
+
+我们先来看看这些转换都做了什么：
+
+  * (index >> order) << order: 这个是将index低位清零。
+  * order - (order % XA_CHUNK_SHIFT): 这个找到order能表达的最大倍数的XA_CHUNK_SHIFT
+  * (1U << (order % XA_CHUNK_SHIFT)) - 1: 表达了order中去除最大倍数XA_CHUNK_SHIFT后剩余的个数（减1）
+
+是不是看上去有点摸不到头脑？不急我们找个例子来看看。
+
+如： index = 0xd15, order = 2
+经过转换后
+index = 0xd14, shift = 0, sibs = 3
+
+这个效果就是这样的
+
+```
+xarray->xa_head = xa_node0
+                  +-------------------------------+
+                  |parent   = NULL                |
+                  |shift    = 8                   |
+                  |max_index= (1 << (8 + 4)) - 1  |
+                  |offset                         |
+                  |                               |
+                  |slots[XA_CHUNK_SIZE]           |
+                  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                  |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+                  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                       |                         |
+                       |                         |
+                       v                         v
+       xa_node2                                  xa_node1
+       +-------------------------------+         +-------------------------------+
+       |parent   = xa_node0            |         |parent   = xa_node0            |
+       |shift    = 4                   |         |shift    = 4                   |
+       |max_index= (1 << (4 + 4)) - 1  |         |max_index= (1 << (4 + 4)) - 1  |
+       |offset   = d                   |         |offset   = 0                   |
+       |                               |         |                               |
+       |slots[XA_CHUNK_SIZE]           |         |slots[XA_CHUNK_SIZE]           |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|         |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                                    |                         |
+                                    |                         +--> [0x090, 0x09f]
+                                    v
+                    xa_node3
+                    +-------------------------------+
+                    |parent   = xa_node2            |
+                    |shift    = 0                   |
+                    |max_index= (1 << 4) - 1        |
+                    |offset   = 1                   |
+                    |                               |
+                    |slots[XA_CHUNK_SIZE]           |
+                    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                    |f|e|d|c|b|a|9|8|x|x|x|4|3|2|1|0|
+                    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                       |                 |
+                       |                 +--> 0xd15
+                       +--> 0xd1e
+```
+
+也就是 [0xd14, 0xd17] 这一段会同时被设置为一个值。
+
+好了，现在我们再来看xas_store中是如何处理存储带有order范围数值的。
+
+```
+offset = xas->xa_offset;
+max = xas->xa_offset + xas->xa_sibs;
+```
+
+这里max就指定好了一段范围，当offset==max时，赋值的循环才会跳出。
+
+```
+entry = xa_mk_sibling(xas->xa_offset);
+```
+
+另外对于后续的slot，填入的值也有所变化。不是entry本身，而是表示自己是范围第一个值的兄弟。
+
+现在我们再来看一个例子：
+
+index = 0xd15, order = 4
+经过转换后
+index = 0xd10, shift = 4, sibs = 0
+
+这个效果就是这样的
+
+```
+xarray->xa_head = xa_node0
+                  +-------------------------------+
+                  |parent   = NULL                |
+                  |shift    = 8                   |
+                  |max_index= (1 << (8 + 4)) - 1  |
+                  |offset                         |
+                  |                               |
+                  |slots[XA_CHUNK_SIZE]           |
+                  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                  |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+                  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                       |                         |
+                       |                         |
+                       v                         v
+       xa_node2                                  xa_node1
+       +-------------------------------+         +-------------------------------+
+       |parent   = xa_node0            |         |parent   = xa_node0            |
+       |shift    = 4                   |         |shift    = 4                   |
+       |max_index= (1 << (4 + 4)) - 1  |         |max_index= (1 << (4 + 4)) - 1  |
+       |offset   = d                   |         |offset   = 0                   |
+       |                               |         |                               |
+       |slots[XA_CHUNK_SIZE]           |         |slots[XA_CHUNK_SIZE]           |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|         |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                                    |                         |
+                              [0xd10, 0xd1f]                  +--> [0x090, 0x09f]
+```
+
+因为order正好是一个node能存储的范围，所以这种情况下就不需要用一个xa_node来表示所有一样的内容。
+也就是说转换过的xa_shift表示了存储时，应该在哪一层。xa_sibs表示了在这一层要占几个slot。（需加1）
+
+我们再回过头来看, 和xa_shift相关的地方：
+
+  * xas_create中，xas_descend过程中限制了 shift > order。也就是往下伸展的时候，只要到order的层级就够了，不需要再往下构造空间
+  * xas_store中，xas->xa_shift < node->shift时， xas->xa_sibs就会清零
+
+## xa_store_range/xas_set_range
+
+比起按照order存入数据，更有意思的时xa_store_range--将数据存入任意一段范围内。而这里面的奥妙就在于函数xas_set_range。
+
+```
+static void xas_set_range(struct xa_state *xas, unsigned long first,
+		unsigned long last)
+{
+	unsigned int shift = 0;
+	unsigned long sibs = last - first;
+	unsigned int offset = XA_CHUNK_MASK;
+
+	xas_set(xas, first);
+
+	while ((first & XA_CHUNK_MASK) == 0) {
+		if (sibs < XA_CHUNK_MASK)
+			break;
+		if ((sibs == XA_CHUNK_MASK) && (offset < XA_CHUNK_MASK))
+			break;
+		shift += XA_CHUNK_SHIFT;
+		if (offset == XA_CHUNK_MASK)
+			offset = sibs & XA_CHUNK_MASK;
+		sibs >>= XA_CHUNK_SHIFT;
+		first >>= XA_CHUNK_SHIFT;
+	}
+
+	offset = first & XA_CHUNK_MASK;
+	if (offset + sibs > XA_CHUNK_MASK)
+		sibs = XA_CHUNK_MASK - offset;
+	if ((((first + sibs + 1) << shift) - 1) > last)
+		sibs -= 1;
+
+	xas->xa_shift = shift;
+	xas->xa_sibs = sibs;
+}
+```
+
+这个函数短短30行，我却看了好几天才算是略有领悟。为了避免下次再花这么长时间，在此记录一下理解。
+
+  * 这个函数把[first, last]这个范围，按照shift(及其整数倍)做划分
+  * 那个while循环只处理first是shift对齐的情况，如果某一个shift段的不是全0，就会跳出循环去设置
+  * while循环中不断增加shift，用来找到更匹配的shift，也就是找到更大的可设置的order
+  * 跳出循环有两种情况： 该[first, last]范围已能被当前的shift覆盖，或者last的低位不是全1[*]
+  * 跳出循环后，offset比较容易确定，直接用first与上XA_CHUNK_MASK即可
+  * 跳出循环后，sibs需要修正，也是有两种情况：sibs = last - first，如果不是迭代到了最后一层sibs肯定是超多XA_CHUNK_MASK的
+    第二中情况是last的低位不是全1[*]
+
+这么些解释中，有一个last为全1的情况比较特殊，需要进一步解释。
+
+以XA_CHUNK_SHIFT为4举例。
+
+对于范围[0, 0xff]，可以是一个shift=8的一个slot。
+而对于[0, 0xfe]则是另外一个情况。首先shift就只能是4， 而能设置到的范围就变成了[0, 0xef]。
+这有点像进位的意思。
 
 # 测试
 
