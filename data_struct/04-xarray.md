@@ -405,6 +405,35 @@ static void xas_set_range(struct xa_state *xas, unsigned long first,
 而对于[0, 0xfe]则是另外一个情况。首先shift就只能是4， 而能设置到的范围就变成了[0, 0xef]。
 这有点像进位的意思。
 
+# 特殊举例
+
+xarray的行为有些做了适配，和我最初设想的有出入。在这里举几个例子看看。
+
+## 存储单个index到已经划分好range的xa中
+
+比如在代码中按如下顺序执行：
+
+```
+xa_store_range(&xa, 2, 64, xa_mk_index(1), 0);
+xa_store(&xa, 32, xa_mk_value(3), 0);
+```
+
+xa_store_range将[2, 64]分割成了， [0, 15] [16, 63] [64] 三个区间。
+
+原先我会以为在store range后，xa_store会单独设置一个index，导致一个像空洞一样的状态。但实际上，结果是区间的形态没有变化。
+还是[0, 15] [16, 63] [64]， 只是把[16, 63]这个区间的值改成了value(3)。
+
+xas_store的函数调用过程简化如下：
+
+```
+xas_store
+    xas_create
+        xas_descend
+    assign value
+```
+
+在descend过程中， 只会在entry为空的情况下在创建一层。而当我们遇到sibling的时候，会返回sibling的长兄，然后就退出了。
+
 # 测试
 
 xarray这个数据结构已经是比较复杂的了，所以内核中提供了对应的代码对这部分做测试用来保证代码质量。
