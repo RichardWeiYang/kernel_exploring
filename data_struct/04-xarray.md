@@ -183,7 +183,7 @@ xas_is_node(): xas_valid(xas) && xas->xa_node => !((unsigned long)xas->xa_node &
 xas_error():   xa_err(xas->xa_node)
 ```
 
-其中我们可以看到，xas->xa_node上赋值的只有这么几种，不是所有entry类型。
+其中我们可以看到，xas->xa_node上赋值的只有这么几种，而不是所有entry类型。
 有了这些，在后面代码阅读中，我们将事半功倍。
 
 # 代码分析
@@ -207,13 +207,15 @@ xas_error():   xa_err(xas->xa_node)
 
 ## xas_store
 
-房子改好了，有了合适的空间，我们就该把想要保存的东西放到指定的空间了。这个工作就交给了xas_store，也可以看到为了确保有足够的空间，xas_store调用了xas_create。
+房子盖好了，有了合适的空间，我们就该把想要保存的东西放到指定的空间了。这个工作就交给了xas_store，也可以看到为了确保有足够的空间，xas_store调用了xas_create。
 
 简单来说，xas_store的工作就是找到slot，并将entry赋值给slot。然而实际的代码要复杂得多，原因是xarray还支持一种“指数”存储的方法。
 
 ## xa_store_order
 
 这个函数就是实现“指数”存储的方法，说来也简单，就是套了XA_STATE_ORDER的xas_store。既然这是重要差别，那我们就来看看究竟做了什么。
+
+### shift/sibs
 
 ```
 #define __XA_STATE(array, index, shift, sibs)  {	\
@@ -234,13 +236,27 @@ xas_error():   xa_err(xas->xa_node)
   * order - (order % XA_CHUNK_SHIFT): 这个找到order能表达的最大倍数的XA_CHUNK_SHIFT
   * (1U << (order % XA_CHUNK_SHIFT)) - 1: 表达了order中去除最大倍数XA_CHUNK_SHIFT后剩余的个数（减1）
 
-是不是看上去有点摸不到头脑？不急我们找个例子来看看。
+是不是看上去有点摸不到头脑？ 不急，我们换个角度先看看shift/sibs的含义。
+
+极端情况，order等于0时，也就是最普通存储单个值时，对应的shift和sibs都为0. 此时的含义为：
+
+**当我们存储单个值，order为0时，我们是在shift为0的node上，占据了1=0+1个slot**
+
+然后我们把这个含义扩展一下
+
+  * shift代表我们存储的这个范围最后落在的node的shift
+  * sibs代表这个范围在node上，会有多少兄弟
+
+### 举个例子
+
+有了这个含义在心里，我们再找个例子来验证一下
 
 如： index = 0xd15, order = 2
-经过转换后
-index = 0xd14, shift = 0, sibs = 3
+经过转换后 **index = 0xd14, shift = 0, sibs = 3**
 
-这个效果就是这样的
+表示这个范围最后会落在一个shift为0的node上，且有3个兄弟。
+
+那效果是不是这样呢？
 
 ```
 xarray->xa_head = xa_node0
@@ -287,7 +303,9 @@ xarray->xa_head = xa_node0
                        +--> 0xd1e
 ```
 
-也就是 [0xd14, 0xd17] 这一段会同时被设置为一个值。
+也就是 [0xd14, 0xd17] 这一段会同时被设置为一个值。怎么样，和我们预想的一样把。
+
+### 代码细节
 
 好了，现在我们再来看xas_store中是如何处理存储带有order范围数值的。
 
@@ -352,7 +370,22 @@ xarray->xa_head = xa_node0
 
 ## xa_store_range/xas_set_range
 
-比起按照order存入数据，更有意思的时xa_store_range--将数据存入任意一段范围内。而这里面的奥妙就在于函数xas_set_range。
+比起按照order存入数据，更有意思的时xa_store_range--**将数据存入任意一段范围内**。
+
+我们先来看一下整体的框架，有个全局的概念。
+
+```
+xa_store_range(first, last)
+{
+  do {
+    xas_set_range(first, last)
+    xas_store()
+    first += xas_size()
+  } while (first <= last)
+}
+```
+
+而这里面的奥妙就在于函数xas_set_range，其目的就是将一个range最大限度按照order切分，然后把切分好的部分各自存储。
 
 ```
 static void xas_set_range(struct xa_state *xas, unsigned long first,
@@ -405,11 +438,11 @@ static void xas_set_range(struct xa_state *xas, unsigned long first,
 而对于[0, 0xfe]则是另外一个情况。首先shift就只能是4， 而能设置到的范围就变成了[0, 0xef]。
 这有点像进位的意思。
 
-# 特殊举例
+# 特例
 
 xarray的行为有些做了适配，和我最初设想的有出入。在这里举几个例子看看。
 
-## 存储单个index到已经划分好range的xa中
+## 默认不改变当前order
 
 比如在代码中按如下顺序执行：
 
