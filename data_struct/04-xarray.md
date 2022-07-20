@@ -467,6 +467,27 @@ xas_store
 
 在descend过程中， 只会在entry为空的情况下在创建一层。而当我们遇到sibling的时候，会返回sibling的长兄，然后就退出了。
 
+## order降级
+
+上面的例子中我们看到，如果之前设置过一个order，那么后续的store还是会延续这个order。那如果我们真的需要改变其中一部分范围的值呢？
+
+这里就要用上xas_split了。
+
+```
+       unsigned int old_order = 3;
+       unsigned int new_order = 2;
+       DEFINE_XARRAY(xa);
+       XA_STATE_ORDER(xas, &xa, 4, new_order);
+
+       xa_store_order(&xa, 0, old_order, xa_mk_value(5), 0);
+       xa_dump(&xa);
+       xas_split_alloc(&xas, xa_mk_value(3), old_order, 0);
+       xas_split(&xas, xa_mk_value(3), old_order);
+       xa_dump(&xa);
+```
+
+这个函数也蛮有意思的。
+
 # 测试
 
 xarray这个数据结构已经是比较复杂的了，所以内核中提供了对应的代码对这部分做测试用来保证代码质量。
