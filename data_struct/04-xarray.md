@@ -492,11 +492,22 @@ xas_store
 
 xarray这个数据结构已经是比较复杂的了，所以内核中提供了对应的代码对这部分做测试用来保证代码质量。
 
-运行测试用例的方法是：
+而且还提供了用户态和内核态两种测试方式：
+
+用户态：
 
 ```
 sudo yum install userspace-rcu-devel.x86_64
 cd tools/testing/radix-tree
 make
 ./xarray
+```
+
+内核态：
+
+```
+先把测试模块配置上
+TEST_XARRAY n -> m
+make modules
+insmod lib/test_xarray.ko
 ```
