@@ -488,6 +488,31 @@ xas_store
 
 这个函数也蛮有意思的。
 
+## 任意指针
+
+之前我们在分析entry的种类时看到，对存入的指针要求低2位为0。因为这个符合了内核中分配出来的内存地址是4字节对齐的。
+
+但这个世界总是有幺蛾子
+
+```
+commit 76b4e52995654af260f14558e0e07b5b039ae202
+Author: Matthew Wilcox <willy@infradead.org>
+Date:   Fri Dec 28 23:20:44 2018 -0500
+
+    XArray: Permit storing 2-byte-aligned pointers
+
+    On m68k, statically allocated pointers may only be two-byte aligned.
+    This clashes with the XArray's method for tagging internal pointers.
+    Permit storing these pointers in single slots (ie not in multislots).
+
+    Signed-off-by: Matthew Wilcox <willy@infradead.org>
+```
+
+但是这么一增加，用来判断entry是否是node的函数xa_is_node就失效了。所以在函数 xas_load 和 xas_free_nodes中分别增加了判断。
+如果已经是在最底层了，那么即便xa_is_node返回真，他也不是一个node。
+
+当然这里其实还是有个限制，那就是我们不会把这个信息存储到高阶的node上。嗯，这真的不是一个很好的特例情况。
+
 # 测试
 
 xarray这个数据结构已经是比较复杂的了，所以内核中提供了对应的代码对这部分做测试用来保证代码质量。
