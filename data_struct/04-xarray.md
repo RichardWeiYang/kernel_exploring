@@ -513,6 +513,28 @@ Date:   Fri Dec 28 23:20:44 2018 -0500
 
 当然这里其实还是有个限制，那就是我们不会把这个信息存储到高阶的node上。嗯，这真的不是一个很好的特例情况。
 
+## XA_FLAGS_ALLOC1
+
+在代码中定一个一个标志位XA_FLAGS_ALLOC1，这个标志位的功能是空出索引0而从1开始。这个是怎么做到的呢？这个我们要从函数xa_alloc函数说起。
+
+```
+xa_alloc()
+  xas_find_marked(&xas, limit.max, XA_FREE_MARK)
+    if (xas_top(xas->xa_node))
+      if (!xa_is_node(entry))
+        xas->index = 1                <--  这里指示从索引1开始
+  *id = xas->index
+  xas_store(&xas, entry)
+    xas_create()
+      if (!entry && xa_zero_busy(xa))
+        entry = XA_ZERO_ENTRY;        <--  这里设置了XA_ZERO_ENTRY
+      xas_expand(xas, entry)          <--  这样索引0就是XA_ZERO_ENTRY了
+```
+
+这样就做到了XA_FLAGS_ALLOC1标志的情况是从索引1开始分配的。
+
+另外两面例子中把索引1删除后也会把索引0也清除，这个是最后走到了xas_shrink()。
+
 # 测试
 
 xarray这个数据结构已经是比较复杂的了，所以内核中提供了对应的代码对这部分做测试用来保证代码质量。
