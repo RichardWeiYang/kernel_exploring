@@ -234,7 +234,7 @@ xas_error():   xa_err(xas->xa_node)
 
   * (index >> order) << order: 这个是将index低位清零。
   * order - (order % XA_CHUNK_SHIFT): 这个找到order能表达的最大倍数的XA_CHUNK_SHIFT
-  * (1U << (order % XA_CHUNK_SHIFT)) - 1: 表达了order中去除最大倍数XA_CHUNK_SHIFT后剩余的个数（减1）
+  * (1U << (order % XA_CHUNK_SHIFT)) - 1: 表达了order中去除最大倍数XA_CHUNK_SHIFT后剩余的个数（**减1**）
 
 是不是看上去有点摸不到头脑？ 不急，我们换个角度先看看shift/sibs的含义。
 
@@ -245,7 +245,7 @@ xas_error():   xa_err(xas->xa_node)
 然后我们把这个含义扩展一下
 
   * shift代表我们存储的这个范围最后落在的node的shift
-  * sibs代表这个范围在node上，会有多少兄弟
+  * sibs代表这个范围在node上，会有多少兄弟(**减1**)
 
 ### 举个例子
 
@@ -361,7 +361,7 @@ xarray->xa_head = xa_node0
 ```
 
 因为order正好是一个node能存储的范围，所以这种情况下就不需要用一个xa_node来表示所有一样的内容。
-也就是说转换过的xa_shift表示了存储时，应该在哪一层。xa_sibs表示了在这一层要占几个slot。（需加1）
+也就是说转换过的xa_shift表示了存储时，应该在哪一层。xa_sibs表示了在这一层要占几个slot。（**需加1**）
 
 我们再回过头来看, 和xa_shift相关的地方：
 
@@ -422,21 +422,57 @@ static void xas_set_range(struct xa_state *xas, unsigned long first,
 
 这个函数短短30行，我却看了好几天才算是略有领悟。为了避免下次再花这么长时间，在此记录一下理解。
 
-  * 这个函数把[first, last]这个范围，按照shift(及其整数倍)做划分
+  * 这个函数把[first, last]这个范围，按照shift(及其指数倍)做划分
   * 那个while循环只处理first是shift对齐的情况，如果某一个shift段的不是全0，就会跳出循环去设置
   * while循环中不断增加shift，用来找到更匹配的shift，也就是找到更大的可设置的order
   * 跳出循环有两种情况： 该[first, last]范围已能被当前的shift覆盖，或者last的低位不是全1[*]
   * 跳出循环后，offset比较容易确定，直接用first与上XA_CHUNK_MASK即可
-  * 跳出循环后，sibs需要修正，也是有两种情况：sibs = last - first，如果不是迭代到了最后一层sibs肯定是超多XA_CHUNK_MASK的
-    第二中情况是last的低位不是全1[*]
+  * 跳出循环后，sibs需要修正，也是有两种情况：
+    * sibs = last - first，如果不是迭代到了最后一层sibs肯定是超过XA_CHUNK_MASK的，所以应当修正。
+      而比较直观的计算是 sibs = XA_CHUNK_SIZE - offset - 1，又因为 XA_CHUNK_MASK = XA_CHUNK_SIZE - 1
+      所以直接就写成了   sibs = XA_CHUNK_MASK - offset
+    * 第二中情况是判断有没有超过last， 而这种情况发生在last的低位不是全1[*]
 
 这么些解释中，有一个last为全1的情况比较特殊，需要进一步解释。
 
-以XA_CHUNK_SHIFT为4举例。
+以XA_CHUNK_SHIFT为4举例，对比[0x00, 0x1f]和[0x00, 0x1e]两个范围的情况。
 
-对于范围[0, 0xff]，可以是一个shift=8的一个slot。
-而对于[0, 0xfe]则是另外一个情况。首先shift就只能是4， 而能设置到的范围就变成了[0, 0xef]。
-这有点像进位的意思。
+```
+  +-------------------------------+          +-------------------------------+
+  |parent   = NULL                |          |parent   = NULL                |
+  |shift    = 4                   |          |shift    = 4                   |
+  |max_index= (1 << (4 + 4)) - 1  |          |max_index= (1 << (4 + 4)) - 1  |
+  |offset                         |          |offset                         |
+  |                               |          |                               |
+  |slots[XA_CHUNK_SIZE]           |          |slots[XA_CHUNK_SIZE]           |
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+  |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|          |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                               | |                                        | |
+                               +-+                                        | |
+                                 |                                        | v  [0x00, 0x0f]
+                                 v                                        |
+                            [0x00, 0x1f]             xa_node1             v [0x10, 0x1f]
+                                                     +-------------------------------+
+                                                     |parent   = xa_node0            |
+                                                     |shift    = 0                   |
+                                                     |max_index= (1 << (0 + 4)) - 1  |
+                                                     |offset   = 1                   |
+                                                     |                               |
+                                                     |slots[XA_CHUNK_SIZE]           |
+                                                     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                                                     |f|e|d|c|b|a|9|8|7|6|5|4|3|2|1|0|
+                                                     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+```
+
+前者[0x00, 0x1f]， 低位全1， 正好占了shift=4节点上了两个slot。
+而后者[0x00, 0x1e]，低位差了一个。但是在while循环中，也迭代到了同一个层级，且sibs此时算出来和前者一样。
+如果不调整sibs，那么设置的结果将和前者情况一致。所以当低位不是全1的时候，我们相当于要从sibs上做一个借位的动作。
+
+类似，另一种情况如 [0x100, 0x1ff] 和 [0x100, 0x1fe]的对比。
+前者在shift = 8的时候才会跳出循环。而后者在shift = 4时就跳出循环了。但此时 sibs = 0x1f - 0x10 = 0xf。
+虽然形式上和前者略有差异，但实际覆盖的返回是一样的。但是因为 0x1fe的低位不是全1，所以sibs也要做借位。
+这样才能设置正确的范围。
 
 # 特例
 
