@@ -571,6 +571,28 @@ xa_alloc()
 
 另外两面例子中把索引1删除后也会把索引0也清除，这个是最后走到了xas_shrink()。
 
+## 删除到只剩0号索引有值
+
+在内核测试代码check_xas_retry中，有一个地方我一直不明白为什么这个测试代码能够通过。
+
+```
+  XA_STATE(xas, xa, 0);
+  xa_store_index(xa, 0, GFP_KERNEL);
+  xa_store_index(xa, 1, GFP_KERNEL);
+
+  xa_erase_index(xa, 1);
+  XA_BUG_ON(xa, !xa_is_retry(xas_reload(&xas)));
+```
+
+为什么最后这个xas_reload得到的结果是retry呢？0号索引不是有一个值么？
+
+**最后，我才发现关键是在删除1号索引后，整个树就只剩0号索引有值。而这是一个特殊情况。**
+
+实际上删除某个索引的操作也是通过xas_store完成的，只是在删除的时候还会继续调用xas_delete_node去清理。而当整个树减少到只有0号索引的时候，那么原先存放0号索引的node就会被删除，而0号索引的值会设置到xa_head。
+
+此时为了避免类似xas_reload的接口从原先的node上访问数据， xas_shrink将原先的值设置成了XA_RETRY_ENTRY。这样保证不会拿到一个旧值。
+
+
 # 测试
 
 xarray这个数据结构已经是比较复杂的了，所以内核中提供了对应的代码对这部分做测试用来保证代码质量。
