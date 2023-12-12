@@ -78,6 +78,17 @@ make install
 
 另外需要注意的是，安装后有些版本可能要调整引导程序的配置。比如在ubuntu上，配置文件在/etc/default/grub， /boot/grub/grub.cfg。否则有时候下一次重启还是使用旧的内核。
 
+## 启动时显示grub界面
+
+ubuntu发行版默认grub配置在启动时是不显示grub界面的。虽然在make install后，大概率重启后能进入新编译/安装的内核。但是这么对内核开发人员来说还是不太友好。需要修改/etc/default/grub文件让grub进入的界面在启动时显示出来。
+
+```
+# GRUB_TIMEOUT_STYLE=hidden
+GRUB_TIMEOUT=10
+```
+
+需要修改的是上面两条。先把隐藏的方式去掉，再设置一个超时时间。
+
 # 重启机器
 
 执行如下命令
@@ -86,4 +97,4 @@ make install
 reboot
 ```
 
-好了，等下次机器起来，那就是一个崭新的世界了。
+好了，等下次机器起来，选择你刚编译安装的内核，那就是一个崭新的世界了。
