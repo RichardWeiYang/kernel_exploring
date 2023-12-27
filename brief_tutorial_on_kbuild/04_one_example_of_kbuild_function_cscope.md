@@ -161,9 +161,21 @@ index 4fa070f9231a..5ac0873cfe4d 100755
 
 希望能帮到你。
 
-## 6.7 版本更新
+## v6.7 版本更新
 
+最新6.7的版本又看了下，现在忽略生成cscope的方式改变了。现在是通过环境变量IGNORE_DIRS来指定需要忽略的路径。
 
+比如
+```
+make IGNORE_DIRS="drivers tools" cscope
+```
+
+或者把变量定义到.bashrc中
+```
+export IGNORE_DIRS="drivers tools"
+```
+
+这样优化后，生成cscope文件的时间大大缩短。文件大小也从1.8M减小到436K。
 
 [1]: /brief_tutorial_on_kbuild/03_first_target_help.md
 [2]: https://www.gnu.org/software/make/manual/html_node/Call-Function.html
