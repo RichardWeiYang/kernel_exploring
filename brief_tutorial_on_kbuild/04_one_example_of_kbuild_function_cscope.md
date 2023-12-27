@@ -161,5 +161,9 @@ index 4fa070f9231a..5ac0873cfe4d 100755
 
 希望能帮到你。
 
+## 6.7 版本更新
+
+
+
 [1]: /brief_tutorial_on_kbuild/03_first_target_help.md
 [2]: https://www.gnu.org/software/make/manual/html_node/Call-Function.html
