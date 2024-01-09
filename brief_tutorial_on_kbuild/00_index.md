@@ -79,6 +79,8 @@
 
 温故而知新，在探索过程中我们是见招拆招，可能用到了不少概念，但没有系统梳理。现把相关知识点整理如下，以便有更好的理解。
 
+[kbuild系统浅析][15]
+
 [linux kernel makefile中的那些小伙伴们][5]
 
 [常见内核目标都是在哪里？][6]
@@ -105,3 +107,4 @@
 [12]: /brief_tutorial_on_kbuild/05_rules_for_single_object.md
 [13]: /brief_tutorial_on_kbuild/04_one_example_of_kbuild_function_cscope.md
 [14]: /brief_tutorial_on_kbuild/08_rule_for_setupbin.md
+[15]: /brief_tutorial_on_kbuild/13_root_makefile.md
