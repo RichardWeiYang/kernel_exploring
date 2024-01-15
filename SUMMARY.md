@@ -14,7 +14,6 @@
     * [真假vmlinux–由vmlinux.bin揭开的秘密](brief_tutorial_on_kbuild/09_rule_for_vmlinux_bin.md)
     * [linux kernel makefile中的那些小伙伴们](brief_tutorial_on_kbuild/10_those_buddy_in_kbuild.md)
     * [常见内核目标都是在哪里？](brief_tutorial_on_kbuild/11_location_of_common_targets.md)
-    * [内核编译过程的调试小窍门](brief_tutorial_on_kbuild/12_debug_tips.md)
 * [启动时的小秘密](bootup/00_index.md)
     * [INIT_CALLS的秘密](bootup/01_init_call.md)
 * [内核页表成长记](kernel_pagetable/00-evolution_of_kernel_pagetable.md)

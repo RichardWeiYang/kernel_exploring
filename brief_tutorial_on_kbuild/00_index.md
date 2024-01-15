@@ -83,11 +83,6 @@
 
 [常见内核目标都是在哪里？][6]
 
-# 调试经验
-
-丑是丑了点，不过凑和还能用。要是有更好的方法，记得告诉我哈～
-
-[内核编译过程的调试小窍门][7]
 
 # 写在最后
 
@@ -103,7 +98,6 @@
 [4]: http://blog.csdn.net/richardysteven/article/details/52551443
 [5]: /brief_tutorial_on_kbuild/10_those_buddy_in_kbuild.md
 [6]: /brief_tutorial_on_kbuild/11_location_of_common_targets.md
-[7]: /brief_tutorial_on_kbuild/12_debug_tips.md
 [8]: https://www.gnu.org/software/make/manual/make.html#Rule-Introduction
 [9]: /brief_tutorial_on_kbuild/01_build_your_first_kernel.md
 [10]: /brief_tutorial_on_kbuild/02_common_targets_in_kernel.md
