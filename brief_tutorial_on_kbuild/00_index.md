@@ -81,10 +81,6 @@
 
 [kbuild系统浅析][15]
 
-[linux kernel makefile中的那些小伙伴们][5]
-
-[常见内核目标都是在哪里？][6]
-
 
 # 写在最后
 
@@ -98,8 +94,6 @@
 [2]: /brief_tutorial_on_kbuild/07_rules_for_bzImage.md
 [3]: /brief_tutorial_on_kbuild/09_rule_for_vmlinux_bin.md
 [4]: http://blog.csdn.net/richardysteven/article/details/52551443
-[5]: /brief_tutorial_on_kbuild/10_those_buddy_in_kbuild.md
-[6]: /brief_tutorial_on_kbuild/11_location_of_common_targets.md
 [8]: https://www.gnu.org/software/make/manual/make.html#Rule-Introduction
 [9]: /brief_tutorial_on_kbuild/01_build_your_first_kernel.md
 [10]: /brief_tutorial_on_kbuild/02_common_targets_in_kernel.md
