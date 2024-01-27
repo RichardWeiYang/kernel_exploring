@@ -126,31 +126,24 @@ static int detect_memory_e820(void)
 
 从刚才的代码中看到，取出的表项放在boot_params中，并不安全，而且取出的表项也没有排序。所以接下来，内核把数据拷贝到指定的数据结构，并排序整个表。
 
-这个步骤在函数default_machine_specific_memory_setup()中完成。
+这个步骤在函数e820__memory_setup_default()中完成。
 
-```c
-char *__init default_machine_specific_memory_setup(void)
+```
+char *__init e820__memory_setup_default(void)
 {
 	char *who = "BIOS-e820";
-	u32 new_nr;
+
 	/*
 	 * Try to copy the BIOS-supplied E820-map.
 	 *
 	 * Otherwise fake a memory map; one section from 0k->640k,
 	 * the next section from 1mb->appropriate_mem_k
 	 */
-	new_nr = boot_params.e820_entries;
-	sanitize_e820_map(boot_params.e820_map,
-			ARRAY_SIZE(boot_params.e820_map),
-			&new_nr);
-	boot_params.e820_entries = new_nr;
-	if (append_e820_map(boot_params.e820_map, boot_params.e820_entries)
-	  < 0) {
+	if (append_e820_table(boot_params.e820_table, boot_params.e820_entries) < 0) {
 		u64 mem_size;
 
-		/* compare results from other methods and take the greater */
-		if (boot_params.alt_mem_k
-		    < boot_params.screen_info.ext_mem_k) {
+		/* Compare results from other methods and take the one that gives more RAM: */
+		if (boot_params.alt_mem_k < boot_params.screen_info.ext_mem_k) {
 			mem_size = boot_params.screen_info.ext_mem_k;
 			who = "BIOS-88";
 		} else {
@@ -158,12 +151,14 @@ char *__init default_machine_specific_memory_setup(void)
 			who = "BIOS-e801";
 		}
 
-		e820.nr_map = 0;
-		e820_add_region(0, LOWMEMSIZE(), E820_RAM);
-		e820_add_region(HIGH_MEMORY, mem_size << 10, E820_RAM);
+		e820_table->nr_entries = 0;
+		e820__range_add(0, LOWMEMSIZE(), E820_TYPE_RAM);
+		e820__range_add(HIGH_MEMORY, mem_size << 10, E820_TYPE_RAM);
 	}
 
-	/* In case someone cares... */
+	/* We just appended a lot of ranges, sanitize the table: */
+	e820__update_table(e820_table);
+
 	return who;
 }
 ```
