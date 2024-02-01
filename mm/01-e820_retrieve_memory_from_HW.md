@@ -186,6 +186,7 @@ char *__init e820__memory_setup_default(void)
                e820__reserve_setup_data();
                e820__finish_early_params();
                e820_add_kernel_range();
+               e820__memblock_setup();
 ```
 
 最后的这个e820_print_map()函数就是打印出我们使用 "dmesg | grep e820"抓取到的信息的函数了。
