@@ -109,7 +109,8 @@ SECTIONS
 
 ```
 start_kernel()
-  rest_init()
+  ...
+  rest_init()              <--- almost last step in start_kernel()
     kernel_init()
       ...
       kernel_init_freeable()
