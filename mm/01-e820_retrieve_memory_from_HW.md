@@ -363,6 +363,8 @@ overlap_list[]的变化一共有两种情况
 * 遇见 "start", 则加入overlap_list[].
 * 遇见 "end", 则将对应的"start"从overlap_list[]中删除
 
+而且值得注意的是，这个overlap_list中的元素并不需要排序。因为这个overlap_list的最用仅仅用来计算current_type的。
+
 "current_type" 整个overlap_list[]数组中type属性的最大值. 而 "last_type" 上一个循环中的"current_type"。 当这两个值不同时，表明了我们遇到了e820数组的边界，这时候就需要添加一个或者设置适当的大小了。
 
 让我再用下面这张图来解释一下这个过程。
