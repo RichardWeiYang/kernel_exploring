@@ -68,10 +68,9 @@
 探索的过程中发现bzImage是由setup.bin和vmlinux.bin两个目标粘合而成。看来马上就要弄明白整个bzImage编译过程了。咱逐个探索～
 
 [setup.bin的诞生记][14]
-
-和
-
 [真假vmlinux--由vmlinux.bin揭开的秘密][3]
+
+弄明白了这两个组成部分后，在来看看[bzImage的全貌][16]
 
 终于，经历了九九八十一难之后，可以说彻底的理解了内核编译的整个过程，也对kbuild系统架构有了基本的认识。可以学成下山了。
 
@@ -102,3 +101,4 @@
 [13]: /brief_tutorial_on_kbuild/04_one_example_of_kbuild_function_cscope.md
 [14]: /brief_tutorial_on_kbuild/08_rule_for_setupbin.md
 [15]: /brief_tutorial_on_kbuild/13_root_makefile.md
+[16]: /brief_tutorial_on_kbuild/14_bzImage_whole_picture.md
