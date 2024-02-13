@@ -264,6 +264,8 @@ ${LD} ${LDFLAGS} ${LDFLAGS_vmlinux} -o ${2}		\
 
 嗯，没错就是它了。
 
+另外这里强调一下，链接时使用的lds是arch/x86/kernel/vmlinux.lds。而这个lds是从arch/x86/kernel/vmlinux.lds.S生成出来的。
+比如说我们将在[INIT_CALLS的秘密][1]看到的定义就是在这里链接时决定的。
 
 # 一张图总结
 
@@ -292,9 +294,12 @@ ${LD} ${LDFLAGS} ${LDFLAGS_vmlinux} -o ${2}		\
 
     KBUILD_VMLINUX_INIT         KBUILD_VMLINUX_MAIN
                \                   /
-                 \              /
-                       vmlinux
+                 \              /  <--- arch/x86/kernel/vmlinux.lds.S
+                   \         /
+                     vmlinux
 
 ```
 
 嗯，丑是丑了点，不过意思都在了。
+
+[1]: /bootup/01_init_call.md
