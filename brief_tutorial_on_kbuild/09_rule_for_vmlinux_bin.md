@@ -142,7 +142,7 @@ At last。
                      error.o
                      cpuflsgs.o
 
-             ||  ld
+             ||  ld <--- arch/x86/boot/compressed/vmlinux.lds
              \/
 
       arch/x86/boot/compressed/vmlinux
