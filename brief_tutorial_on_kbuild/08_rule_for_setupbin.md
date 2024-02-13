@@ -74,6 +74,8 @@ setup.bin的编译过程确实简单，来一张图略微总结那么一下子�
         video-bios.o
 
                     ||
+                    ||  <--- arch/x86/boot/setup.ld
+                    ||
                     \/
 
 				 setup.elf
