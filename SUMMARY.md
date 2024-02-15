@@ -16,6 +16,7 @@
     * [kbuild系统浅析](brief_tutorial_on_kbuild/13_root_makefile.md)
 * [启动时的小秘密](bootup/00_index.md)
     * [INIT_CALLS的秘密](bootup/01_init_call.md)
+    * [start_kernel之前](bootup/02_before_start_kernel.md)
 * [内核页表成长记](kernel_pagetable/00-evolution_of_kernel_pagetable.md)
     * [未解压时的内核页表](kernel_pagetable/01-pagetable_before_decompressed.md)
     * [内核早期的页表](kernel_pagetable/02-pagetable_compiled_in.md)
