@@ -6,6 +6,7 @@
 # 计算当前内核被加载的地址
 
 进入保护模式内核后，有这么一段代码是用来计算保护模式内核被加载到哪里，并把这个地址保存到epb中。
+arch/x86/boot/compressed/head_64.S
 
 ```
 	leal	(BP_scratch+4)(%esi), %esp
@@ -72,5 +73,87 @@ You can list individual entries with 'info gdt [NUM]' or groups with 'info gdt [
 ```
 
 看来确实是0。
+
+# 切换GDT
+
+紧接着内核切换了gdt.
+
+```
+	/* Load new GDT with the 64bit segments using 32bit descriptor */
+	leal	rva(gdt)(%ebp), %eax
+	movl	%eax, 2(%eax)
+	lgdt	(%eax)
+```
+
+而这里的gdt定义是
+
+```
+SYM_DATA_START_LOCAL(gdt)
+	.word	gdt_end - gdt - 1
+	.long	0
+	.word	0
+	.quad	0x00cf9a000000ffff	/* __KERNEL32_CS */
+	.quad	0x00af9a000000ffff	/* __KERNEL_CS */
+	.quad	0x00cf92000000ffff	/* __KERNEL_DS */
+	.quad	0x0080890000000000	/* TS descriptor */
+	.quad   0x0000000000000000	/* TS continued */
+SYM_DATA_END_LABEL(gdt, SYM_L_LOCAL, gdt_end)
+```
+
+所以，gdt这块区域的开头几个字节是用作gdtr的,而且16位的界限已经定义好了。但是基址没有定义，因为运行时的地址我们事先不知道。但是还记得我们刚才分析的代码么？对了，就是后把当前加载的地址保存到了ebp。所以这第一句 leal rva(gdt)(%ebp), %eax就是计算了gdt的基址。
+
+分析完了，那就用bochs调试一下看看。我们在leal这句执行完后，查看一下。
+
+```
+<bochs:24> r
+rax: 0x00000000_00b2a010 rcx: 0x00000000_00000000
+rdx: 0x00000000_00000000 rbx: 0x00000000_00000000
+...
+```
+
+说明gdt的地址在0xb2a010，我们用内存查看工具查看一下。
+
+```
+<bochs:26> xp /4xw 0x00b2a010
+[bochs]:
+0x0000000000b2a010 <bogus+       0>:	0x0000002f	0x00000000	0x0000ffff	0x00cf9a00
+```
+
+其中0x2f是界限，意思是gdt的大小是0x2f + 0x01 = 0x30 也就是有48字节。而我们gdt中，正好占了48字节，符合！
+再来看dump出来的第二块8字节，因为x86是little endian的，所以实际值就是0x00cf9a000000ffff。这个不正好和__KERNEL32_CS所应以的值一样吗？完美！
+
+执行完movl	%eax, 2(%eax)后，我们再查看一下内存。因为gdt的最开始两个字节是界限，我们跳过这部分，直接dump后面的四个字节。
+
+```
+<bochs:33> xp /xw 0x00b2a012
+[bochs]:
+0x0000000000b2a012 <bogus+       0>:	0x00b2a010
+```
+
+显示此时这部分内存的内容已经是我们刚才所得到的gdt基址0x00b2a010了。
+
+切换gdt的前后，我们都查看一下gdt。
+```
+<bochs:35> info gdt
+Global Descriptor Table (base=0x0000000000013c50, limit=39):
+GDT[0x00]=??? descriptor hi=0x00000000, lo=0x00000000
+GDT[0x01]=??? descriptor hi=0x00000000, lo=0x00000000
+GDT[0x02]=Code segment, base=0x00000000, limit=0xffffffff, Execute/Read, Non-Conforming, Accessed, 32-bit
+GDT[0x03]=Data segment, base=0x00000000, limit=0xffffffff, Read/Write, Accessed
+GDT[0x04]=32-Bit TSS (Busy) at 0x00001000, length 0x00067
+<bochs:36> n
+Next at t=109056323
+(0) [0x000000000010001d] 0010:000000000010001d (unk. ctxt): mov eax, 0x00000018       ; b818000000
+<bochs:37> info gdt
+Global Descriptor Table (base=0x0000000000b2a010, limit=47):
+GDT[0x00]=??? descriptor hi=0x000000b2, lo=0xa010002f
+GDT[0x01]=Code segment, base=0x00000000, limit=0xffffffff, Execute/Read, Non-Conforming, 32-bit
+GDT[0x02]=Code segment, base=0x00000000, limit=0xffffffff, Execute/Read, Non-Conforming, 64-bit
+GDT[0x03]=Data segment, base=0x00000000, limit=0xffffffff, Read/Write
+GDT[0x04]=32-Bit TSS (Available) at 0x00000000, length 0x00000
+GDT[0x05]=??? descriptor hi=0x00000000, lo=0x00000000
+```
+
+这里可以看到，gdt确实发生了变化。大功告成！
 
 [1]: /bootup/02_before_start_kernel.md
