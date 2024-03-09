@@ -156,4 +156,88 @@ GDT[0x05]=??? descriptor hi=0x00000000, lo=0x00000000
 
 这里可以看到，gdt确实发生了变化。大功告成！
 
+# 计算解压缩内核用的地址
+
+接下来有一段看着很长，实际功能简单的代码。注释上说计算解压缩的内核的之，并保存到ebx中。
+
+```
+#ifdef CONFIG_RELOCATABLE
+	movl	%ebp, %ebx
+	movl	BP_kernel_alignment(%esi), %eax # eax = align
+	decl	%eax                            # eax = (align - 1)
+	addl	%eax, %ebx			# ebx = ebx + (align -1)
+	notl	%eax				# eax = !eax
+	andl	%eax, %ebx			# ebx = ebx & !eax
+	cmpl	$LOAD_PHYSICAL_ADDR, %ebx
+	jae	1f
+#endif
+	movl	$LOAD_PHYSICAL_ADDR, %ebx
+1:
+```
+
+我翻译了一下代码，并写道了注释里。如果用c来写，其实就是这么一句。
+
+```
+#define ALIGN(x, a)	(((x) + (a) - 1) & ~((a) - 1))
+
+ALIGN(ebp, kernel_alignment)
+```
+
+那这个alignment是多少呢？这个值是从BP_kernel_alignment(%esi)这个地址取出来的。这个esi实际指向了bootparam，而BP_kernel_alignment是其中hdr里kernel_alignemnt的字段。看了下arch/x86/boot/header.S，这个值是在编译的时候定义号的。
+
+```
+kernel_alignment:  .long CONFIG_PHYSICAL_ALIGN	#physical addr alignment
+						#required for protected mode
+						#kernel
+```
+
+而这个CONFIG_PHYSICAL_ALIGN是一个配置项，看了下当前配置的值是0x200000。也就是2M。
+
+分析完了，我们用bochs来验证一下：
+
+* kernel_alignment是不是0x200000
+* 计算完后，ebx是不是等于ebp向上2M对齐。ebp是刚才计算出来保护模式内核的加载地址1M，所以ebx预期也是2M
+
+```
+<bochs:43> n
+Next at t=121856756
+(0) [0x0000000000100050] 0008:0000000000100050 (unk. ctxt): mov eax, dword ptr ds:[esi+560] ;
+<bochs:44> r
+rax: 0x00000000_00000000 rcx: 0x00000000_00002028
+rdx: 0x00000000_06000000 rbx: 0x00000000_00100000
+...
+<bochs:45> n
+Next at t=121856757
+(0) [0x0000000000100056] 0008:0000000000100056 (unk. ctxt): dec eax                   ; 48
+<bochs:46> r
+rax: 0x00000000_00200000 rcx: 0x00000000_00002028
+rdx: 0x00000000_06000000 rbx: 0x00000000_00100000
+```
+
+在从kernel_alignment取值前后各查看了eax。可以看出，kernel_alignment确实是0x200000。
+
+然后我们确认一下ebx的值。
+
+```
+<bochs:52> n
+Next at t=121856761
+(0) [0x000000000010005d] 0008:000000000010005d (unk. ctxt): cmp ebx, 0x01000000       ; 81fb00000001
+<bochs:53> r
+rax: 0x00000000_ffe00000 rcx: 0x00000000_00002028
+rdx: 0x00000000_06000000 rbx: 0x00000000_00200000
+rsp: 0x00000000_00b30000 rbp: 0x00000000_00100000
+```
+
+我们在cmp这条语句断点，查看rbx确实也是0x200000。
+
+这时候我发现了一个定义，
+
+```
+#define CONFIG_PHYSICAL_START 0x1000000
+```
+
+这也是一个内核配置，默认是16M。所以我们辛辛苦苦算了半天，最后因为ebx小于16M，导致ebx还是强制设置成了16M。
+好吧，白看了半天。
+
+
 [1]: /bootup/02_before_start_kernel.md
