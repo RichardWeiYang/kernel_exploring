@@ -275,5 +275,75 @@ Next at t=173074964
 
 瞧，正如我们所料。
 
+# 移动压缩内核
+
+在[bzImage的全貌][2]中，我们看到安装的内核是被压缩过，再打包的。而为了解压缩，需要先把已加载的，压缩内核搬移到新的位置，再来做解压缩。
+
+```
+/*
+ * Copy the compressed kernel to the end of our buffer
+ * where decompression in place becomes safe.
+ */
+	leaq	(_bss-8)(%rip), %rsi
+	leaq	rva(_bss-8)(%rbx), %rdi
+	movl	$(_bss - startup_32), %ecx
+	shrl	$3, %ecx
+	std
+	rep	movsq
+	cld
+```
+
+其中rbx是搬移后压缩内核的起始地址，但是为了避免在搬运过程中破坏内存，所以是从高地址到低地址搬运。好了，我们搬运完后来查看一下。
+
+```
+<bochs:54> u /7
+00100288: (                    ): lea rsi, qword ptr ds:[rip+10665321] ; 488d3569bda200
+0010028f: (                    ): lea rdi, qword ptr ds:[rbx+10665976] ; 488dbbf8bfa200
+00100296: (                    ): mov ecx, 0x00a2c000       ; b900c0a200
+0010029b: (                    ): shr ecx, 0x03             ; c1e903
+0010029e: (                    ): std                       ; fd
+0010029f: (                    ): rep movsq qword ptr es:[rdi], qword ptr ds:[rsi] ; f348a5
+001002a2: (                    ): cld                       ; fc
+<bochs:55> r
+rax: 0x00000000_00000000 rcx: 0x00000000_6c65746e
+rdx: 0x00000000_49656e69 rbx: 0x00000000_0359a000
+rsp: 0x00000000_03fca000 rbp: 0x00000000_01000000
+...
+<bochs:56> u 0x0359a000 0x0359a010
+0359a000: (                    ): add byte ptr ds:[rax], al ; 0000
+0359a002: (                    ): add byte ptr ds:[rax], al ; 0000
+0359a004: (                    ): add byte ptr ds:[rax], al ; 0000
+0359a006: (                    ): add byte ptr ds:[rax], al ; 0000
+0359a008: (                    ): add byte ptr ds:[rax], al ; 0000
+0359a00a: (                    ): add byte ptr ds:[rax], al ; 0000
+0359a00c: (                    ): add byte ptr ds:[rax], al ; 0000
+0359a00e: (                    ): add byte ptr ds:[rax], al ; 0000
+```
+
+搬运先查看一下寄存器，rbx的值是0x0359a000。也就是一会儿我们预期把压缩的内核搬运到这个地址。并且我们先反汇编这个地址，发现此时地址内的内容都是0。
+
+```
+<bochs:63> u 0x0359a000 0x0359a010
+0359a000: (                    ): cld                       ; fc
+0359a001: (                    ): cli                       ; fa
+0359a002: (                    ): lea esp, dword ptr ds:[rsi+488] ; 8da6e8010000
+0359a008: (                    ): call .+0                  ; e800000000
+0359a00d: (                    ): pop rbp                   ; 5d
+0359a00e: (                    ): sub ebp, 0x0000000d       ; 83ed0d
+```
+
+搬运完后，我们再反汇编一下。发现此时已经有内容了。而且可以对比一下，这段代码和startup_32正好一样！
+
+```
+/*
+ * Jump to the relocated address.
+ */
+	leaq	rva(.Lrelocated)(%rbx), %rax
+	jmp	*%rax
+```
+
+接下来内核就会跳转到 rbx + Lrelocated继续运行。因为rbx就是刚才新搬运的地址0x0359a000，所以从这里开始内核就在新的地址运行了。差不多是在53M左右的地址空间。
+
 
 [1]: /bootup/02_before_start_kernel.md
+[2]: /brief_tutorial_on_kbuild/14_bzImage_whole_picture.md
