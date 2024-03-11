@@ -239,5 +239,41 @@ rsp: 0x00000000_00b30000 rbp: 0x00000000_00100000
 这也是一个内核配置，默认是16M。所以我们辛辛苦苦算了半天，最后因为ebx小于16M，导致ebx还是强制设置成了16M。
 好吧，白看了半天。
 
+# 直接从startup_64开始debug
+
+32位下的工作确实有限，我们也不能每次都从startup_32开始一步步debug。那怎么直接设置断点到startup_64呢？其实答案就在代码里。
+
+```
+	.code64
+	.org 0x200
+SYM_CODE_START(startup_64)
+	/*
+	 * 64bit entry is 0x200 and it is ABI so immutable!
+	 ...
+```
+
+也就是说，startup_64的偏移一定是0x200（又是这512字节）。应为startup_32的偏移是0，所以如果要直接断点在startup_64，可以在0x100200地址设置断点。我们来验证一下：
+
+```
+<bochs:64> pb 0x100200
+<bochs:65> c
+(0) Breakpoint 4, 0x0000000000100200 in ?? ()
+Next at t=173074964
+(0) [0x0000000000100200] 0010:0000000000100200 (unk. ctxt): cld                       ; fc
+<bochs:66> u /10
+00100200: (                    ): cld                       ; fc
+00100201: (                    ): cli                       ; fa
+00100202: (                    ): xor eax, eax              ; 31c0
+00100204: (                    ): mov ds, ax                ; 8ed8
+00100206: (                    ): mov es, ax                ; 8ec0
+00100208: (                    ): mov ss, ax                ; 8ed0
+0010020a: (                    ): mov fs, ax                ; 8ee0
+0010020c: (                    ): mov gs, ax                ; 8ee8
+0010020e: (                    ): lea rbp, qword ptr ds:[rip-533] ; 488d2debfdffff
+00100215: (                    ): mov eax, dword ptr ds:[rsi+560] ; 8b8630020000
+```
+
+瞧，正如我们所料。
+
 
 [1]: /bootup/02_before_start_kernel.md
