@@ -18,6 +18,7 @@
     * [INIT_CALLS的秘密](bootup/01_init_call.md)
     * [start_kernel之前](bootup/02_before_start_kernel.md)
     * [保护模式内核代码赏析](bootup/03_analysis_protected_kernel.md)
+    * [内核压缩与解压](bootup/04_compress_decompress_kernel.md)
 * [内核页表成长记](kernel_pagetable/00-evolution_of_kernel_pagetable.md)
     * [未解压时的内核页表](kernel_pagetable/01-pagetable_before_decompressed.md)
     * [内核早期的页表](kernel_pagetable/02-pagetable_compiled_in.md)

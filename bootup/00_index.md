@@ -21,6 +21,9 @@
 
 有了称手的工具后，我们就可以[保护模式内核代码赏析][3]
 
+然后我们看看[内核压缩与解压][4]
+
 [1]: /bootup/01_init_call.md
 [2]: /bootup/02_before_start_kernel.md
 [3]: /bootup/03_analysis_protected_kernel.md
+[4]: /bootup/04_compress_decompress_kernel.md
