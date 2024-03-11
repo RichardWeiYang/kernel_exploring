@@ -9,13 +9,26 @@
                                      |
                                    vmlinux
                                      |
+                                     | <-- objdump
+                                     |
+                             arch/x86/boot/compressed/vmlinux.bin
+                                     |
+                                     | <-- compress
+                                     |
+                             arch/x86/boot/compressed/vmlinux.bin.zst
+                                     |
+                                     | <-- mkpiggy
+                                     |
+                             arch/x86/boot/compressed/piggy.S
+                                     |
+                                     |
                                      |  arch/x86/boot/compressed/*
        arch/x86/boot/*                \  /
               |                        \/
               | <-- setup.ld            | <-- vmlinux.lds
               |                         |
               |                         v
-              |              arch/x86/boot/compressed/vmlinux 
+              |              arch/x86/boot/compressed/vmlinux
               |                         |
               |                         | <-- objcopy
               |                         |
