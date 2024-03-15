@@ -248,4 +248,97 @@ rdx: 0x00000000_000003d5 rbx: 0x00000000_02aa2000
 
 慢着，为啥是startup_64呢？这还要从链接和加载说起。
 
+# 链接与加载
+
+我们解压缩出来的vmlinux是ELF格式的。就像在《自己动手写操作系统》所讲的一样，我们需要按照program header中描述的把内核加载到指定位置才行。而不是解压缩完了就行了。
+
+## vmlinux的program header
+
+我们先来看看编译出来的vmlinux中program header的样子
+
+```
+$readelf -l vmlinux
+
+Elf file type is EXEC (Executable file)
+Entry point 0x1000000
+There are 5 program headers, starting at offset 64
+
+Program Headers:
+  Type           Offset             VirtAddr           PhysAddr
+                 FileSiz            MemSiz              Flags  Align
+  LOAD           0x0000000000200000 0xffffffff81000000 0x0000000001000000
+                 0x00000000017ddb0c 0x00000000017ddb0c  R E    0x200000
+  LOAD           0x0000000001a00000 0xffffffff82800000 0x0000000002800000
+                 0x00000000003e5000 0x00000000003e5000  RW     0x200000
+  LOAD           0x0000000001e00000 0x0000000000000000 0x0000000002be5000
+                 0x0000000000032068 0x0000000000032068  RW     0x200000
+  LOAD           0x0000000002018000 0xffffffff82c18000 0x0000000002c18000
+                 0x00000000003cf000 0x0000000000610000  RWE    0x200000
+  NOTE           0x00000000019ddab8 0xffffffff827ddab8 0x00000000027ddab8
+                 0x0000000000000054 0x0000000000000054         0x4
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     .text .rodata .pci_fixup .tracedata __ksymtab __ksymtab_gpl __kcrctab __kcrctab_gpl __ksymtab_strings __init_rodata __param __modver __ex_table .notes 
+   01     .data __bug_table .vvar 
+   02     .data..percpu 
+   03     .init.text .altinstr_aux .init.data .x86_cpu_dev.init .retpoline_sites .return_sites .call_sites .altinstructions .altinstr_replacement .apicdrivers .exit.text .smp_locks .data_nosave .bss .brk 
+   04     .notes
+```
+
+其中VirtAddr和PhysAddr是我们要关心的。为什么会是这样的值呢？
+
+## vmlinux.lds.S
+
+在编译vmlinux时，采用了链接脚本vmlinux.lds.S。我们看到的地址，就是在链接脚本中定义的。
+
+该脚本太长，我们截取其中一部分看一下。
+
+```
+#define __START_KERNEL_map	_AC(0xffffffff80000000, UL)
+#define __START_KERNEL		(__START_KERNEL_map + LOAD_PHYSICAL_ADDR)
+
+#define LOAD_OFFSET __START_KERNEL_map
+
+SECTIONS
+{
+	. = __START_KERNEL;
+	phys_startup_64 = ABSOLUTE(startup_64 - LOAD_OFFSET);
+
+	/* Text and read-only data */
+	.text :  AT(ADDR(.text) - LOAD_OFFSET) {
+		_text = .;
+...
+}
+```
+
+先说一个概念，链接脚本中有两种地址： vma (virtial memory address); lma (load memory address)。对应的应该就是program header中的VirtAddr和PhysAddr。
+
+首先我们看到的是一个定义贼长的地址，__START_KERNEL_map。对，这个就是定义了内核地址空间的结界。高地址的2G空间，是内核专属空间。
+
+接下来我们看.text的vma和lma。vma的值就是__START_KERNEL = __START_KERNEL_map + LOAD_PHYSICAL_ADDR。这个LOAD_PHYSICAL_ADDR就是16M。所以这两个值的和就是0xffffffff81000000。是不是和program header中第一个的VirtAddr对上了。lma是由冒号后面的AT关键字定义的。值是.text的地址 - LOAD_OFFSET，其实算下来就是LOAD_PHYSICAL_ADDR。是不是又和program header对上了？
+
+所以编译链接完后，我们内核该加载到哪里，该是什么地址运行都已经写得清清楚楚了！
+
+## 加载到各自的位置
+
+既然我们看到每个program header标识了应该被加载到的位置，那内核什么时候被加载的呢？还记得我们刚才看的内核解压缩么？就藏在那里面了。
+
+```
+decompress_kernel()
+  parse_elf()
+	for (i = 0; i < ehdr.e_phnum; i++) {
+		phdr = &phdrs[i];
+		switch (phdr->p_type) {
+		case PT_LOAD:
+			dest = (void *)(phdr->p_paddr);
+			memmove(dest, output + phdr->p_offset, phdr->p_filesz);
+			break;
+		default: /* Ignore other PT_* */ break;
+		}
+	}
+```
+
+对了，就是这么一个个program header加载过去的。
+
 [1]: /brief_tutorial_on_kbuild/14_bzImage_whole_picture.md
