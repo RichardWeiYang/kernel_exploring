@@ -17,13 +17,13 @@
 就好像应用程序main函数在执行之前，加载器会做准备工作一样。在内核真正运行前也要有很多准备工作。
 但是因为准备工作确实有点多，我这里只记录以下目前我知道的。
 
-首先我们 用bochs探索[start_kernel之前][2]的黑暗世界。
+首先我们 用bochs探索[bootloader如何加载bzImage][2]。
 
 有了称手的工具后，我们就可以[保护模式内核代码赏析][3]
 
 然后我们看看[内核压缩与解压][4]
 
 [1]: /bootup/01_init_call.md
-[2]: /bootup/02_before_start_kernel.md
+[2]: /bootup/02_how_bzImage_loaded.md
 [3]: /bootup/03_analysis_protected_kernel.md
 [4]: /bootup/04_compress_decompress_kernel.md

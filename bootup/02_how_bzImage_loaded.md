@@ -58,7 +58,9 @@ startup_32 -> startup_64 -> extract_kernel ->
 startup_64 -> initial_code -> x86_64_start_kernel -> x86_64_start_reservations
 ```
 
-但是真的是这样吗？如何可以确认呢？好了，那就请出bochs模拟器。来确认一下整个流程吧。
+但是真的是这样吗？如何可以确认呢？经过一番研究，发现第一步要确认的是bzImage被bootloader加载到了哪里。
+
+幸好我们知道bochs模拟器，那就请出他来确认一下整个流程吧。
 
 
 # 安装bochs

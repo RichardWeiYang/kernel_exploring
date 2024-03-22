@@ -1,7 +1,7 @@
 进入保护模式内核后，还有很多和体系结构相关的工作需要准备。
 下面我们就利用bochs的调试功能，对这部分代码作一些分析。
 
-具体如何进入到这部分调试界面，可参考[start_kernel之前][1]
+具体如何进入到这部分调试界面，可参考[bootloader如何加载bzImage][1]
 
 # 计算当前内核被加载的地址
 
@@ -345,5 +345,5 @@ rsp: 0x00000000_03fca000 rbp: 0x00000000_01000000
 接下来内核就会跳转到 rbx + Lrelocated继续运行。因为rbx就是刚才新搬运的地址0x0359a000，所以从这里开始内核就在新的地址运行了。差不多是在53M左右的地址空间。
 
 
-[1]: /bootup/02_before_start_kernel.md
+[1]: /bootup/02_how_bzImage_loaded.md
 [2]: /brief_tutorial_on_kbuild/14_bzImage_whole_picture.md
