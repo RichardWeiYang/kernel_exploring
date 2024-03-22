@@ -6,9 +6,9 @@
 
 首先我们用bochs探索[bootloader如何加载bzImage][2]。
 
-有了称手的工具后，我们就可以[保护模式内核代码赏析][3]
-
 然后我们看看[内核压缩与解压][4]
+
+最后记录一些学习过程中的[保护模式内核代码赏析][3]
 
 [2]: /load_kernel/02_how_bzImage_loaded.md
 [3]: /load_kernel/03_analysis_protected_kernel.md
