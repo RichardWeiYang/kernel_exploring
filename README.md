@@ -19,6 +19,8 @@ My major contributions go into:
 * MM
 * x86 misc
 
+No.4 active contributor in mm for [v5.11][5]
+
 Here are the patches merged in kernel:
 
 [2011-2016][1]
@@ -39,3 +41,4 @@ Welcome comments and discussion :-)
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/log/?qt=author&q=richard.weiyang%40gmail.com
 [3]: support.md
 [4]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/log/?qt=author&q=richardw.yang%40linux.intel.com
+[5]: https://lwn.net/Articles/845831/
