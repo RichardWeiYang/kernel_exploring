@@ -19,6 +19,7 @@
 * [内核加载全流程](load_kernel/00_index.md)
     * [bootloader如何加载bzImage](load_kernel/02_how_bzImage_loaded.md)
     * [内核压缩与解压](load_kernel/04_compress_decompress_kernel.md)
+    * [内核加载的几个阶段](load_kernel/05_phases_in_loading.md)
     * [保护模式内核代码赏析](load_kernel/03_analysis_protected_kernel.md)
 * [内核页表成长记](kernel_pagetable/00-evolution_of_kernel_pagetable.md)
     * [未解压时的内核页表](kernel_pagetable/01-pagetable_before_decompressed.md)
