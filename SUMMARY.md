@@ -66,6 +66,8 @@
     * [memcg初始化](memcg/01-init_overview.md)
     * [限制memcg大小](memcg/02-set_memcg_limit.md)
     * [对memcg记账](memcg/03-charge_memcg.md)
+  * 通用
+    * [常用全局变量](mm/common/00_global_variable.md)
 * [中断和异常](interrupt_exception/00-start_from_hardware.md)
   * [从IDT开始](interrupt_exception/01-idt.md)
   * [中断？异常？有什么区别](interrupt_exception/02-difference.md)
