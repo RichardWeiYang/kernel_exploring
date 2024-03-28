@@ -124,7 +124,7 @@ static int detect_memory_e820(void)
 
 ## 保存表项到内核区域
 
-从刚才的代码中看到，取出的表项放在boot_params中，并不安全，而且取出的表项也没有排序。所以接下来，内核把数据拷贝到指定的数据结构，并排序整个表。
+从刚才的代码中看到，取出的表项放在boot_params中，并不安全，而且取出的表项也没有排序。所以接下来，内核把数据拷贝到指定的变量e820_table，并排序整个表。
 
 这个步骤在函数e820__memory_setup_default()中完成。
 
@@ -164,8 +164,10 @@ char *__init e820__memory_setup_default(void)
 ```
 
 关键的细节不在这个函数中，而是在:
-* sanitize_e820_map(), 对整个表排序
 * append_e820_map(), 把整个表拷贝到指定的数据结构
+* e820__update_table(), 对整个表按照类型规整并排序
+
+当这步做完，预期在变量e820_table中保存了一个按照type区分，并且排序的数组。其中对应的是物理内存的区间及其属性。
 
 # 启动顺序
 
@@ -221,7 +223,7 @@ Well, that's it~
 
 # 一些有趣的算法
 
-## sanitize_e820_map()
+## e820__update_table()
 
 这是用来排序从硬件中获取的e820表项的函数。
 
@@ -234,9 +236,9 @@ Well, that's it~
     |type               |             |end,   e820entry        |
     +-------------------+             +------------------------+
 
-### 整个表形成了一个change_member的数组
+### 整个表形成了一个change_member类型的数组
 
-     change_member*[]                               change_member[]
+     change_point*[]                                change_point_list[]
      +------------------------+                     +------------------------+
      |*start1                 |      ------>        |start1, entry1          |
      +------------------------+                     +------------------------+
@@ -255,9 +257,9 @@ Well, that's it~
      |*end4                   |      ------>        |end4,   entry4          |
      +------------------------+                     +------------------------+
 
-### 对change_member->addr排序
+### 对change_point->addr排序
 
-     change_member*[]                
+     change_point*[]                
      +------------------------+      
      |*start1                 |      
      +------------------------+      
@@ -276,9 +278,9 @@ Well, that's it~
      |*end3                   |      
      +------------------------+      
 
-### 遍历排序后的change_member* 数组
+### 遍历排序后的change_point* 数组
 
-因为chage_mamber已经排序了，所以遍历数组就得到了整个内存空间从小到大的顺序。
+因为change_point已经排序了，所以遍历数组就得到了整个内存空间从小到大的顺序。
 
 比如我们现在排序后是这样的结果。
 
@@ -288,14 +290,15 @@ Well, that's it~
 
 #### 用overlap_list跟踪 "type"的变化
 
-overlap_list保存了遍历过程中没有配对的change_member。每次有变动都会计算一下整个数组中的type属性。如果有变化，则表明有内存区域的临界值出现。
+overlap_list保存了遍历过程中没有配对的change_point。每次有变动都会计算一下整个数组中的type属性。
+如果本次计算的type和上一次计算的type不一致，则表明有内存区域的临界值出现。
 
 下面是手动展开的一个例子:
 
 ```
 * chgidx == 0
 
-     change_member*[]                      overlap_list[]
+     change_point*[]                       overlap_list[]
      +------------------------+            +-------------------+
  --> |*start1                 |            |*start1            |
      +------------------------+            +-------------------+
