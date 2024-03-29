@@ -83,9 +83,10 @@ memblock的重要作用就是内核初期的内存分配器了。那通过memblo
 start_kernel()
     setup_arch()
         e820__memory_setup()
-        memblock_set_current_limit()
+        memblock_set_current_limit(ISA_END_ADDRESS)
         e820__memblock_setup()
             memblock_add()
+                memblock_add_range(&memblock.memory, base, size, MAX_NUMNODES, 0)
             memblock_dump_all()
 ```
 
@@ -157,11 +158,16 @@ void __init e820__memblock_setup(void)
 ### no overlap
 
 ```
+                                              (base,     end)
+                      [rbase,             rend]
+
+或者
+
     (base,     end)
                       [rbase,             rend]
 ```
 
-这种情况也简单， 直接添加就好。
+这种情况也简单， 直接添加就好。另外，这第二个情况说明已经遍历完现有的区域，可以停止了。
 
 ### partial overlapped – beginning
 
@@ -229,6 +235,22 @@ void __init e820__memblock_setup(void)
 * start_rgn/end_rgn  返回划分完后这段区域对应的编号
 
 其实就是划分，划分完了返回被划分的那段区域的编号～
+
+## memblock_find_in_range_node
+
+通过for_each_free_mem_range_reverse在指定的区域，找到空闲的内存空间。
+
+# 各种遍历
+
+## for_each_mem_pfn_range
+
+单纯遍历memblock.memory，只要对应的区域大小超过一个page，就返回该区域的首末地址和nid。
+
+## for_each_free_mem_range
+
+同时遍历memblock.memory和memblock.reserved，并找出在memory中，但是不在reserved中的区域。
+
+这样可以找出空闲的内存区域。
 
 [1]: https://lkml.org/lkml/2010/7/13/114
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/mm/memblock.c?id=95f72d1ed41a66f1c1c29c24d479de81a0bea36f
