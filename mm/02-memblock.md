@@ -10,7 +10,15 @@ memblock也不是内核的原配，在memblock之前还有其他的初期内存�
 
 可以看到，memblock以前叫lmb，而这个补丁只是改了下名字。
 
-再具体的历史信息我也不是很清楚了，如果有更多好玩的信息，欢迎告诉我～
+而这个lmb是Paul Mackerras在2005年写的
+
+[7c8c6b9776fb41134d87ef50706a777a45d61cd4][4]
+
+真是好古早哦。
+
+不过现在的实现和当年的实现可以说是千差万别了。当前的实现是Tejun Heo重新实现的。
+
+[784656f9c680d334e7b4cdb6951c5c913e5a26bf][5]
 
 # 整体架构
 
@@ -255,3 +263,5 @@ void __init e820__memblock_setup(void)
 [1]: https://lkml.org/lkml/2010/7/13/114
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/mm/memblock.c?id=95f72d1ed41a66f1c1c29c24d479de81a0bea36f
 [3]: https://0xax.gitbooks.io/linux-insides/content/MM/linux-mm-1.html
+[4]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=7c8c6b9776fb41134d87ef50706a777a45d61cd4
+[5]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=784656f9c680d334e7b4cdb6951c5c913e5a26bf
