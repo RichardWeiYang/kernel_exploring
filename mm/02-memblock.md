@@ -65,22 +65,6 @@ memblock管理了两段区域：memblock.memory和memblock.reserved。
 
 PS:其实我隐藏了一个很重要的信息，不过现在暂时不需要看到他。待到春花烂漫，你们自然就会相见。
 
-# 重要API
-
-对memblock有了大致的了解，你或许会想知道相关的api是什么样子的，是怎么使用的。
-
-## 添加删除内存区域
-
-使用memblock的第一步就是要从下一层中获取可用的内存区域并填写到memblock.memory中。这是通过memblock_add() and memblock_remove()实现的。而且这两个函数保证运行后memblock中的区域是排序的。
-
-**注意：这两个函数只改变memblock.memory。**
-
-## 分配释放内存
-
-memblock的重要作用就是内核初期的内存分配器了。那通过memblock来分配释放内存分别通过memblock_alloc() and memblock_free()来实现。
-
-**注意： 这两个函数只改变memblock.reserved。**
-
 # 获得最初的内存布局
 
 之前我们已经看过，内存的信息通过e820从硬件中获取保存在了相应的结构体中。那现在的问题就是memblock是怎么对应上实际的物理内存的呢？
@@ -134,6 +118,25 @@ void __init e820__memblock_setup(void)
 ```
 
 通过他就建立了硬件信息和memblock之间的联系。在x86平台上，不断从e820中获取内存底层信息，并添加到memblock中。你看是不是很简单了。
+
+# 重要API
+
+对memblock有了大致的了解，你或许会想知道相关的api是什么样子的，是怎么使用的。
+
+## 添加删除内存区域
+
+使用memblock的第一步就是要从下一层中获取可用的内存区域并填写到memblock.memory中。这是通过memblock_add() and memblock_remove()实现的。而且这两个函数保证运行后memblock中的区域是排序的。
+
+**注意：这两个函数只改变memblock.memory。**
+
+## 分配释放内存
+
+memblock的重要作用就是内核初期的内存分配器了。那通过memblock来分配释放内存分别通过memblock_alloc() and memblock_free()来实现。
+
+**注意： 这两个函数只改变memblock.reserved。**
+
+memblock_phys_alloc 返回的是物理地址
+memblock_alloc      返回的是虚拟地址
 
 # 具体实现
 
