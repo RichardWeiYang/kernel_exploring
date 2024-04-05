@@ -260,6 +260,25 @@ void __init e820__memblock_setup(void)
 
 这样可以找出空闲的内存区域。
 
+# 调试和测试
+
+## 调试
+
+kernel parameter中加上 memblock=debug，可以开启debug模式。
+
+* 在dmesg中打印相关调试信息
+* 在debugfs中可以查看各个类型信息
+
+不过这个debugfs要配置上了后，才能看到。
+
+## 测试
+
+memblock作为启动初期的代码，不是很好调试。所以社区在tools/testing/memblock目录下，有针对memblock的测试代码。如果有什么memblock的改动，建议先运行测试程序，确保测试程序无误。
+
+进入该目录后直接make，生成测试程序，然后直接运行./main。
+
+也可以 make NUMA=1，测试有numa的情况。
+
 [1]: https://lkml.org/lkml/2010/7/13/114
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/mm/memblock.c?id=95f72d1ed41a66f1c1c29c24d479de81a0bea36f
 [3]: https://0xax.gitbooks.io/linux-insides/content/MM/linux-mm-1.html
