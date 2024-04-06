@@ -260,6 +260,12 @@ memblock_alloc      返回的是虚拟地址
 
 通过for_each_free_mem_range_reverse在指定的区域，找到空闲的内存空间。
 
+## memblock_alloc_range_nid
+
+这是各种memblock_alloc的最终内部实现。
+
+主要调用了memblock_find_in_range_node找到空闲的空间。
+
 # 各种遍历
 
 ## for_each_mem_pfn_range
