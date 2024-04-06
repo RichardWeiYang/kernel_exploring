@@ -121,17 +121,17 @@ void __init e820__memblock_setup(void)
 
 通过他就建立了硬件信息和memblock之间的联系。在x86平台上，不断从e820中获取内存底层信息，并添加到memblock中。你看是不是很简单了。
 
-# 重要API
+# 对外的API
 
 对memblock有了大致的了解，你或许会想知道相关的api是什么样子的，是怎么使用的。
 
-## 添加删除内存区域
+## memblock_add_[node]/memblock_remove
 
 使用memblock的第一步就是要从下一层中获取可用的内存区域并填写到memblock.memory中。这是通过memblock_add() and memblock_remove()实现的。而且这两个函数保证运行后memblock中的区域是排序的。
 
 **注意：这两个函数只改变memblock.memory。**
 
-## 分配释放内存
+## memblock_alloc/memblock_free
 
 memblock的重要作用就是内核初期的内存分配器了。那通过memblock来分配释放内存分别通过memblock_alloc() and memblock_free()来实现。
 
