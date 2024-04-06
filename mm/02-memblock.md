@@ -82,6 +82,9 @@ start_kernel()
             memblock_dump_all()
         init_mem_mapping()
         memblock_set_current_limit(get_max_mapped())
+    mm_core_init()
+        mem_init()
+            memblock_free_all() // release free pages to buddy, including memblock data structure
 ```
 
 在x86平台，这个工作就交给了 e820__memblock_setup()，从e820信息中构建了memblock。
