@@ -80,6 +80,8 @@ start_kernel()
             memblock_add()
                 memblock_add_range(&memblock.memory, base, size, MAX_NUMNODES, 0)
             memblock_dump_all()
+        init_mem_mapping()
+        memblock_set_current_limit(get_max_mapped())
 ```
 
 在x86平台，这个工作就交给了 e820__memblock_setup()，从e820信息中构建了memblock。
@@ -215,6 +217,10 @@ memblock_alloc      返回的是虚拟地址
 ```
 
 这种情况下(base, rend)部分将会被忽略，而base会直接赋值为rend。这样也就回到了第二种情况 no overlap。
+
+## memblock_remove_range()
+
+这是add range的另一半。
 
 ## memblock_isolate_range()
 
