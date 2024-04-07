@@ -65,7 +65,7 @@ memblock管理了两段区域：memblock.memory和memblock.reserved。
 
 PS:其实我隐藏了一个很重要的信息，不过现在暂时不需要看到他。待到春花烂漫，你们自然就会相见。
 
-# 获得最初的内存布局
+# 初始化流程
 
 之前我们已经看过，内存的信息通过e820从硬件中获取保存在了相应的结构体中。那现在的问题就是memblock是怎么对应上实际的物理内存的呢？
 
@@ -123,6 +123,39 @@ void __init e820__memblock_setup(void)
 ```
 
 通过他就建立了硬件信息和memblock之间的联系。在x86平台上，不断从e820中获取内存底层信息，并添加到memblock中。你看是不是很简单了。
+
+## 剔除已经占用的部分
+
+随着代码的阅读，发现之前遗漏了非常重要的一部分。
+
+当我们从e820上报的内存信息构建memblock信息时，我们的内核其实已经占用了一部分物理内存。所以如果我们不加处理，那内核已经使用的物理内存就会被当作可用部分而挪作他用。当然后果可想而知。
+
+接下来，我们尝试看看内核初始化过程中，有哪些地方剔除已经占用的物理内存。
+
+```
+start_kernel()
+    setup_arch()
+        early_reserve_memory()
+            memblock_reserve(__pa_symbol(_text), )
+            memblock_reserve(0, SZ_64K)
+            early_reserve_initrd()
+            memblock_x86_reserve_range_setup_data()
+            reserve_bios_regions()
+
+        e820__memory_setup()
+
+        e820_add_kernel_range() // 把[_text, _end]从e820里去除了
+
+        reserve_brk()
+            memblock_reserve(__pa_symbol(_brk_start), )
+
+        memblock_set_current_limit(ISA_END_ADDRESS)
+        e820__memblock_setup()
+```
+
+从上面的流程可以看出，在真正建立memblock信息之前，已经把占用的内存给reserve了。
+
+不过里面有意思的是，有些地方是先reserve memblock，再清理了e820的信息，比如e820_add_kernel_range。理论上e820上没有标明可用的内存是不会在memblock里出现的。可能是为了在memblock中留个念想吧。
 
 # 对外的API
 
