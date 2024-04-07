@@ -23,11 +23,34 @@
 正因为phys_base的偏移是基于__START_KERNEL_map计算出来的，所以如此计算后就得到了内核代码中符号的物理地址。
 
 
-# __va()
+# __va() / phys_to_virt()
 
+只能对有内核映射的地址调用该函数，来获得对应地址的虚拟地址。
+
+```
+static inline void *phys_to_virt(phys_addr_t address)
+{
+	return __va(address);
+}
+
+#define __PAGE_OFFSET_BASE_L4	_AC(0xffff888000000000, UL)
+unsigned long page_offset_base __ro_after_init = __PAGE_OFFSET_BASE_L4;
+
+#define __PAGE_OFFSET           page_offset_base
+#define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
+
+#define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
+```
+
+再x86_64架构下，大概率是这么个定义。
+
+也就是一个物理地址（非内核代码范围内的）的虚拟地址 = 虚拟地址 + 0xffff888000000000。
+
+这是因为在映射整个内存空间时，是这么操作的。具体参见[映射完整物理地址][2]
 
 # __pa()
 
-# phys_to_virt()
+
 
 [1]: /mm/common/00_global_variable.md
+[2]: /kernel_pagetable/04-map_whole_memory.md
