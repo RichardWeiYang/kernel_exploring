@@ -5,6 +5,7 @@
 据我所知，相关的秘密就在这个函数之中了。
 
 ```
+init_mem_mapping()
 	/* the ISA range is always mapped regardless of memory holes */
 	init_memory_mapping(0, ISA_END_ADDRESS);
 
@@ -38,36 +39,52 @@
 具体代码分析就不在这看了。做个小实验，看一下映射后的效果。
 
 ```
+ arch/x86/mm/init.c | 37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+
 diff --git a/arch/x86/mm/init.c b/arch/x86/mm/init.c
-index 22af912..b3f0d27 100644
+index 679893ea5e68..f9d46ee0b4f9 100644
 --- a/arch/x86/mm/init.c
 +++ b/arch/x86/mm/init.c
-@@ -589,6 +589,14 @@ static void __init memory_map_bottom_up(unsigned long map_start,
+@@ -754,6 +754,27 @@ static void __init init_trampoline(void)
  void __init init_mem_mapping(void)
  {
  	unsigned long end;
 +	int i, j;
 +	pud_t *pud;
 +
-+	pr_err(": init_level3_pgt = %lx\n", __pa_symbol(level3_kernel_pgt));
++	pr_err(": level3_kernel_pgt = %lx\n", __pa_symbol(level3_kernel_pgt));
++	for (i = 0; i < 512; i++) {
++		if (pgd_val(early_top_pgt[i])) {
++			pr_err(": early_top_pgt[%d] 0x%lx\n",
++				i, pgd_val(early_top_pgt[i]));
++
++			pud = (pud_t *)pgd_page_vaddr(early_top_pgt[i]);
++
++			for(j = 0; j < 512; j++)
++				if (pud_val(pud[j]))
++					pr_err(": \t pud[%d] = %lx\n",
++						j, pud_val(pud[j]));
++                }
++        }
 +	for (i = 0; i < 512; i++)
-+		if (pgd_val(init_level4_pgt[i]))
-+			pr_err(": init_level4_pgt[%d] 0x%lx\n",
-+				i, pgd_val(init_level4_pgt[i]));
-
++		if (pgd_val(init_top_pgt[i]))
++			pr_err(": init_top_pgt[%d] 0x%lx\n",
++				i, pgd_val(init_top_pgt[i]));
+ 
+ 	pti_check_boottime_disable();
  	probe_page_size_mask();
-
-@@ -624,6 +632,21 @@ void __init init_mem_mapping(void)
+@@ -791,6 +812,22 @@ void __init init_mem_mapping(void)
  		memory_map_top_down(ISA_END_ADDRESS, end);
  	}
-
+ 
 +	pr_err(": after memory mapped\n");
 +	for (i = 0; i < 512; i++) {
-+		if (pgd_val(init_level4_pgt[i])) {
-+			pr_err(": init_level4_pgt[%d] 0x%lx\n",
-+				i, pgd_val(init_level4_pgt[i]));
++		if (pgd_val(init_top_pgt[i])) {
++			pr_err(": init_top_pgt[%d] 0x%lx\n",
++				i, pgd_val(init_top_pgt[i]));
 +
-+			pud = (pud_t *)pgd_page_vaddr(init_level4_pgt[i]);
++			pud = (pud_t *)pgd_page_vaddr(init_top_pgt[i]);
 +
 +			for(j = 0; j < 512; j++)
 +				if (pud_val(pud[j]))
@@ -76,9 +93,13 @@ index 22af912..b3f0d27 100644
 +		}
 +	}
 +
++
  #ifdef CONFIG_X86_64
  	if (max_pfn > max_low_pfn) {
- 		/* can we preseve max_low_pfn ?*/
+ 		/* can we preserve max_low_pfn ?*/
+-- 
+2.34.1
+
 ```
 
 该代码就是打印了两层的页表，显示的是物理地址。实验的结果是：
