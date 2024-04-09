@@ -80,8 +80,13 @@ start_kernel()
             memblock_add()
                 memblock_add_range(&memblock.memory, base, size, MAX_NUMNODES, 0)
             memblock_dump_all()
-        init_mem_mapping()
+        init_mem_mapping() // 设置内核页表
         memblock_set_current_limit(get_max_mapped())
+
+        initmem_init() -> x86_numa_init()
+        x86_init.paging.pagetable_init() -> paging_init()
+            sparse_init()
+            zone_size_init()
     mm_core_init()
         mem_init()
             memblock_free_all() // release free pages to buddy, including memblock data structure
