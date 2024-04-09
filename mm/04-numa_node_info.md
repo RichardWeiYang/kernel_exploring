@@ -27,6 +27,8 @@ setup_arch()
             numa_register_memblks()
 ```
 
+更全的大局观参考[memblock][1]一节中的**初始化流程**。
+
 接下来我们关注的就是最后这两个函数的作用。
 
 # 将numa信息保存到numa_meminfo
@@ -115,3 +117,4 @@ memblock的调试信息默认没有打开，所以要观察的话需要传入内
 
 [1]: https://en.wikipedia.org/wiki/Non-uniform_memory_access
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=474aeffd88b87746a75583f356183d5c6caa4213
+[3]: /mm/02-memblock.md
