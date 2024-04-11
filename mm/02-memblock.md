@@ -84,6 +84,8 @@ start_kernel()
         memblock_set_current_limit(get_max_mapped())
 
         initmem_init() -> x86_numa_init()
+            numa_register_memblks()
+                alloc_node_data(nid) // allocate pgdata for each node
         x86_init.paging.pagetable_init() -> paging_init()
             sparse_init()
             zone_size_init()
