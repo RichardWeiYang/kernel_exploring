@@ -22,9 +22,14 @@ setup_arch()
   initmem_init()
     x86_numa_init()
         numa_init()
-            x86_acpi_numa_init()
+            x86_acpi_numa_init() -> acpi_numa_init()
+                acpi_parse_memory_affinity() -> acpi_numa_memory_affinity_init()
+                    numa_add_memblk()
+                        numa_add_memblk_to(nid, start, end, &numa_meminfo) //  save info to numa_meminfo
             numa_cleanup_meminfo()
             numa_register_memblks()
+                alloc_node_data(nid) // allocate pgdata for each node
+                    node_set_online(nid)
 ```
 
 更全的大局观参考[memblock][1]一节中的**初始化流程**。
@@ -107,13 +112,48 @@ memblock的调试信息默认没有打开，所以要观察的话需要传入内
 
 注意看每个memory条目的最后，现在每个memblock上都多了一个输出"on node 0"。这就是物理内存的NUMA信息。当然我这里只有一个node，如果你的系统上有多个node那就可以看到不一样的信息了。
 
-# 插播一条我的补丁
+## 插播一条我的补丁
 
 在code review过程中，发现numa_nodemask_from_meminfo()的作用其实可以被别的东西替代。所以我干脆提了个补丁把这个挪走了。
 
 补丁的id是：[474aeffd88b87746a75583f356183d5c6caa4213][2]
 
 不过可惜的是，这个补丁还有点小问题。新的改进也写好了，但是到现在还没有合入。社区嘛，你懂的。
+
+# 重要的全局变量
+
+## node_stats[NR_NODE_STATES]
+
+这是一个nodemask_t类型的数组，其中每一个数组表达一个纬度的信息。
+
+```
+enum node_states {
+	N_POSSIBLE,		/* The node could become online at some point */
+	N_ONLINE,		/* The node is online */
+	N_NORMAL_MEMORY,	/* The node has regular memory */
+#ifdef CONFIG_HIGHMEM
+	N_HIGH_MEMORY,		/* The node has regular or high memory */
+#else
+	N_HIGH_MEMORY = N_NORMAL_MEMORY,
+#endif
+	N_MEMORY,		/* The node has memory(regular, high, movable) */
+	N_CPU,		/* The node has one or more cpus */
+	N_GENERIC_INITIATOR,	/* The node has one or more Generic Initiators */
+	NR_NODE_STATES
+};
+```
+
+其中有两个常用的，被单独重命名。
+
+```
+#define node_online_map 	node_states[N_ONLINE]
+#define node_possible_map 	node_states[N_POSSIBLE]
+```
+
+## node_data[MAX_NUMNODES]
+
+每个numa节点的pgdata。
+
 
 [1]: https://en.wikipedia.org/wiki/Non-uniform_memory_access
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=474aeffd88b87746a75583f356183d5c6caa4213
