@@ -324,7 +324,7 @@ memblock_alloc      返回的是虚拟地址
 
 kernel parameter中加上 memblock=debug，可以开启debug模式。
 
-* 在dmesg中打印相关调试信息
+* 在dmesg中打印相关调试信息，在dmesg中搜"MEMBLOCK configuration"
 * 在debugfs中可以查看各个类型信息
 
 不过这个debugfs要配置上了后，才能看到。
