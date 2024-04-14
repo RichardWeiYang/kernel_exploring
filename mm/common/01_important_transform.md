@@ -1,4 +1,6 @@
-# __pa_symbol()
+# 虚拟地址和物理地址
+
+## __pa_symbol()
 
 获取内核程序中符号的物理地址，也就是nm vmlinux命令能显示出的内容。
 
@@ -22,7 +24,7 @@
 
 正因为phys_base的偏移是基于__START_KERNEL_map计算出来的，所以如此计算后就得到了内核代码中符号的物理地址。
 
-# __pa()
+## __pa()
 
 计算出虚拟地址对应的物理地址。
 
@@ -50,7 +52,7 @@ static __always_inline unsigned long __phys_addr_nodebug(unsigned long x)
 第一种情况，说明虚拟地址在内核代码空间，所以实际上就退化成和__pa_symbol()一样。
 第二种情况，转换过程和__va相反。这说明传入的虚拟地址需要是在内核页表上映射的空间内。
 
-# __va() / phys_to_virt()
+## __va() / phys_to_virt()
 
 只能对有内核映射的地址调用该函数，来获得对应地址的虚拟地址。
 
@@ -75,7 +77,46 @@ unsigned long page_offset_base __ro_after_init = __PAGE_OFFSET_BASE_L4;
 
 这是因为在映射整个内存空间时，是这么操作的。具体参见[映射完整物理地址][2]
 
+# pfn和struct page
 
+这里先列出只有sparsemem的情况
+
+## __pfn_to_page(pfn)
+
+```
+static inline struct page *__section_mem_map_addr(struct mem_section *section)
+{
+	unsigned long map = section->section_mem_map;
+	map &= SECTION_MAP_MASK;
+	return (struct page *)map;
+}
+
+#define __pfn_to_page(pfn)				\
+({	unsigned long __pfn = (pfn);			\
+	struct mem_section *__sec = __pfn_to_section(__pfn);	\
+	__section_mem_map_addr(__sec) + __pfn;		\
+})
+```
+
+先根据pfn找到对应的section，然后对section->section_mem_map做一个偏移运算得到struct page的地址。
+
+## __page_to_pfn(pg)
+
+```
+static inline unsigned long page_to_section(const struct page *page)
+{
+	return (page->flags >> SECTIONS_PGSHIFT) & SECTIONS_MASK;
+}
+
+#define __page_to_pfn(pg)					\
+({	const struct page *__pg = (pg);				\
+	int __sec = page_to_section(__pg);			\
+	(unsigned long)(__pg - __section_mem_map_addr(__nr_to_section(__sec)));	\
+})
+```
+
+先根据page找到对应的section，注意这里找是因为把sectino number写在了page->flags里。
+然后再对section->section_mem_map做一个偏移得到pfn。
 
 [1]: /mm/common/00_global_variable.md
 [2]: /kernel_pagetable/04-map_whole_memory.md

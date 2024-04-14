@@ -6,6 +6,16 @@
 max_pfn = e820__end_of_ram_pfn();
 ```
 
+# MAX_PHYSMEM_BITS
+
+最大支持物理内存
+
+```
+# define MAX_PHYSMEM_BITS	(pgtable_l5_enabled() ? 52 : 46)
+```
+
+也就是说，没有5级页表的情况下，物理内存最多是64T。
+
 # phys_base
 
 定义在head_64.S
