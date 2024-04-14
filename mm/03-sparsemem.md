@@ -84,7 +84,7 @@ SPARSEMEM提出了一个新的概念
 接下来我们再来看看section中是如何管理这个struct page的。
 
 ```
-    mem_section                     
+    mem_section
     +-----------------------------+
     |pageblock_flags              |
     |   (unsigned long *)         |
@@ -118,10 +118,39 @@ SPARSEMEM提出了一个新的概念
 需要注意一点的是section_mem_map对应的内存是动态分配的。所以如果这个section对应的物理内存不存在，即便是mem_section的空间会被分配，其对应的struct page的空间是不会被分配的。这样起到了节省内存的作用。
 
 **page结构体在这里**
+
 **page结构体在这里**
+
 **page结构体在这里**
 
 重要的事情说三遍。
+
+## mem_section中的数字
+
+这里我们来看看mem_section定义里的一些数字的含义。
+
+```
+#define SECTIONS_PER_ROOT       (PAGE_SIZE / sizeof (struct mem_section))
+#define NR_SECTION_ROOTS	DIV_ROUND_UP(NR_MEM_SECTIONS, SECTIONS_PER_ROOT)
+
+struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
+```
+
+这里可以看出mem_section这个二维数组的第二维正好是一个PAGE_SIZE的大小。
+
+```
+# define SECTION_SIZE_BITS	27 /* matt - 128 is convenient right now */
+# define MAX_PHYSMEM_BITS	(pgtable_l5_enabled() ? 52 : 46)
+
+#define SECTIONS_SHIFT	(MAX_PHYSMEM_BITS - SECTION_SIZE_BITS)
+
+#define NR_MEM_SECTIONS		(1UL << SECTIONS_SHIFT)
+```
+
+NR_MEM_SECTIONS 定义了整个mem_section二维数组中mem_section的个数。那这个个数是怎么算出来的呢？
+
+原来目前x86_64存在最大支持的物理内存限制。如果没有5级页表，最大支持的是2^46=64T内存。而每个section支持的是2^27=128M。
+所以以此可以得出整个mem_section二维数组的个数是2^(46-27)=2^19个section。
 
 # 变慢了么？
 
