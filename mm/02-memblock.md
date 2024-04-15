@@ -310,13 +310,17 @@ memblock_alloc      返回的是虚拟地址
 
 ## for_each_mem_pfn_range
 
-单纯遍历memblock.memory，只要对应的区域大小超过一个page，就返回该区域的首末地址和nid。
+单纯遍历memblock.memory，只要对应的区域大小超过一个page，就返回该区域的首末地址的pfn和nid。
+
+值得注意的是返回的end_pfn实际上是不属于这个区域的。
 
 ## for_each_free_mem_range
 
 同时遍历memblock.memory和memblock.reserved，并找出在memory中，但是不在reserved中的区域。
 
 这样可以找出空闲的内存区域。
+
+同样，这里返回的end也不属于当前区域范围。
 
 # 调试和测试
 
