@@ -83,8 +83,11 @@ start_kernel()
         init_mem_mapping() // 设置内核页表
         memblock_set_current_limit(get_max_mapped())
 
-        initmem_init() -> x86_numa_init()
+        initmem_init() -> x86_numa_init() -> numa_init()
+            memblock_set_node(0, ULLONG_MAX, &memblock.memory, MAX_NUMNODES) // 默认都先归到node MAX_NUMNODES
+            memblock_set_node(0, ULLONG_MAX, &memblock.reserved, MAX_NUMNODES)
             numa_register_memblks()
+                memblock_set_node() // 再根据numa信息设置真实的node
                 alloc_node_data(nid) // allocate pgdata for each node
         x86_init.paging.pagetable_init() -> paging_init()
             sparse_init()
