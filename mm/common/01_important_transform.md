@@ -118,5 +118,53 @@ static inline unsigned long page_to_section(const struct page *page)
 先根据page找到对应的section，注意这里找是因为把sectino number写在了page->flags里。
 然后再对section->section_mem_map做一个偏移得到pfn。
 
+# 虚拟地址和struct page
+
+有了上面两个转换，自然可以推导出这个转换。也就是形成了地址和struct page之间的关系。
+
+## virt_to_page()
+
+```
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+```
+
+这个转换没有什么太多可以解释的，不过这里有另一个检查的函数值得一看。
+
+```
+bool __virt_addr_valid(unsigned long x)
+{
+	unsigned long y = x - __START_KERNEL_map;
+
+	/* use the carry flag to determine if x was < __START_KERNEL_map */
+	if (unlikely(x > y)) {
+		x = y + phys_base;
+
+		if (y >= KERNEL_IMAGE_SIZE)
+			return false;
+	} else {
+		x = y + (__START_KERNEL_map - PAGE_OFFSET);
+
+		/* carry flag will be set if starting x was >= PAGE_OFFSET */
+		if ((x > y) || !phys_addr_valid(x))
+			return false;
+	}
+
+	return pfn_valid(x >> PAGE_SHIFT);
+}
+```
+
+就是这个用来判断虚拟地址是否有效的函数。可以看出在内核中认为有效的虚拟地址空间有两个：
+
+* __START_KERNEL_map以上的内核代码空间
+* PAGE_OFFSET以上的direct mapping空间
+
+其余部分都是无效空间。
+
+## page_to_virt()
+
+```
+#define page_to_virt(x)	__va(PFN_PHYS(page_to_pfn(x)))
+```
+
 [1]: /mm/common/00_global_variable.md
 [2]: /kernel_pagetable/04-map_whole_memory.md
