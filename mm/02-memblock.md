@@ -95,6 +95,13 @@ start_kernel()
     mm_core_init()
         mem_init()
             memblock_free_all() // release free pages to buddy, including memblock data structure
+    rest_init()
+        kernel_init()
+            kernel_init_freeable()
+                page_alloc_init_late()
+                    memblock_discard() // discard region array
+            free_initmem()
+                free_kernel_image_pages() // 释放__init标记的，在__init_begin/end之间的内存
 ```
 
 在x86平台，这个工作就交给了 e820__memblock_setup()，从e820信息中构建了memblock。
