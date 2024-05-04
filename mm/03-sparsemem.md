@@ -52,9 +52,11 @@ SPARSEMEM提出了一个新的概念
 
 而且这也是为什么做内存热插拔时，要求至少时128M的原因。有意思吧。
 
-# 简单图解
+# 图解数据结构
 
 讲的多了，用图来给大家展示一下。
+
+## mem_section[][]
 
 先来看看全局mem_section数组。这个数组的每一个元素是mem_section结构体，名字上有重复，大家要注意。
 
@@ -80,6 +82,41 @@ SPARSEMEM提出了一个新的概念
 ```
 
 怎么样，这么看是不是还挺简单的。就是用数组去覆盖整个内存的区域，然后分块管理么。
+
+这里我们再来看看mem_section定义里的一些数字的含义。
+
+首先看看二维数组大小的定义。
+
+```
+#define SECTIONS_PER_ROOT       (PAGE_SIZE / sizeof (struct mem_section))
+#define NR_SECTION_ROOTS	    DIV_ROUND_UP(NR_MEM_SECTIONS, SECTIONS_PER_ROOT)
+
+struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
+```
+
+这里可以看出mem_section这个二维数组的第二维正好是一个PAGE_SIZE的大小。
+而整个数组中一共有NR_MEM_SECTIONS个元素。因为这是一个二维数组定义，所以整个系统中所能处理的物理内存大小也就由此决定了。
+
+接下来我们就来看看这个数组个数，以及系统所能处理的物理内存最大值。
+
+```
+# define SECTION_SIZE_BITS	27 /* matt - 128 is convenient right now */
+# define MAX_PHYSMEM_BITS	(pgtable_l5_enabled() ? 52 : 46)
+
+#define SECTIONS_SHIFT	(MAX_PHYSMEM_BITS - SECTION_SIZE_BITS)
+
+#define NR_MEM_SECTIONS		(1UL << SECTIONS_SHIFT)
+```
+
+在上面的定义中我们可以得到两个信息：
+
+1. 每个mem_section代表的内存大小是 2^27 = 128M
+2. 系统能处理的最大内存是事先定义好的MAX_PHYSMEM_BITS
+
+比如在x86系统上，如果没有5级页表，最大支持的是2^46=64T内存。而每个section支持的是2^27=128M。
+所以以此可以得出整个mem_section二维数组的个数是2^(46-27)=2^19，也就是一共有 2^19 个section。
+
+## section中的struct page
 
 接下来我们再来看看section中是如何管理这个struct page的。
 
@@ -124,33 +161,6 @@ SPARSEMEM提出了一个新的概念
 **page结构体在这里**
 
 重要的事情说三遍。
-
-## mem_section中的数字
-
-这里我们来看看mem_section定义里的一些数字的含义。
-
-```
-#define SECTIONS_PER_ROOT       (PAGE_SIZE / sizeof (struct mem_section))
-#define NR_SECTION_ROOTS	DIV_ROUND_UP(NR_MEM_SECTIONS, SECTIONS_PER_ROOT)
-
-struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
-```
-
-这里可以看出mem_section这个二维数组的第二维正好是一个PAGE_SIZE的大小。
-
-```
-# define SECTION_SIZE_BITS	27 /* matt - 128 is convenient right now */
-# define MAX_PHYSMEM_BITS	(pgtable_l5_enabled() ? 52 : 46)
-
-#define SECTIONS_SHIFT	(MAX_PHYSMEM_BITS - SECTION_SIZE_BITS)
-
-#define NR_MEM_SECTIONS		(1UL << SECTIONS_SHIFT)
-```
-
-NR_MEM_SECTIONS 定义了整个mem_section二维数组中mem_section的个数。那这个个数是怎么算出来的呢？
-
-原来目前x86_64存在最大支持的物理内存限制。如果没有5级页表，最大支持的是2^46=64T内存。而每个section支持的是2^27=128M。
-所以以此可以得出整个mem_section二维数组的个数是2^(46-27)=2^19个section。
 
 # 变慢了么？
 
