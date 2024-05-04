@@ -226,10 +226,11 @@ struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
             init_mem_mapping()
             initmem_init()
             x86_init.paging.pagetable_init() -> paging_init()
-                sparse_memory_present_with_active_regions(MAX_NUMNODES);
-                    memory_present()                   mark section present
                 sparse_init()
+                    memblock_present()                 mark section present
                     sparse_init_nid()                  setup section's memmap/usermap
+                node_clear_state(0, N_MEMORY);
+                node_clear_state(0, N_NORMAL_MEMORY)
                 zone_sizes_init()                      init pgdat
 ```
 
