@@ -243,6 +243,52 @@ struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
 
 ## for_each_present_section_nr(start, section_nr)
 
+# SPARSEMEM_VMEMMAP
 
+在上面"变慢了么"部分，我们看到采用了sparsemem后，pfn<->page之间的转换步骤变多了。而这个转换在内核中却是一个非常频繁的操作。于是乎，内核中增加了SPARSEMEM_VMEMMAP配置。
+
+我们先看看这个内核中是如何描述这个配置的。
+
+```
+	  SPARSEMEM_VMEMMAP uses a virtually mapped memmap to optimise
+	  pfn_to_page and page_to_pfn operations.  This is the most
+	  efficient option when sufficient kernel resources are available.
+```
+
+总的来说也没有什么神秘的，也就是用空间换时间。通过将地址转换关系写到页表中，来加速两者之间的转换。
+
+具体的转换暂且按下不表，我有点好奇的是我们需要分配多少虚拟地址空间能满足系统最大支持的物理内存？我们尝试来计算一下。
+
+已知
+
+* 最大支持的物理内存 = 2 ^ MAX_PHYSMEM_BITS = 2 ^ 46 = 64T
+* 一个page表达 2 ^ 12 = 4K
+* 一个page占64 byte
+
+由此可以计算支持最大物理内存所对应的page需要的虚拟空间
+
+```
+64T / 4K * 64 = 1T
+```
+
+所以地址空间中需要1T才能真正满足最大物理内存的情况。
+
+这一点我们在[内核文档][2]中也能得到印证。
+
+```
+ffffea0000000000 |  -22    TB | ffffeaffffffffff |    1 TB | virtual memory map (vmemmap_base)
+```
+
+而这个ffffea0000000000正是地址映射的起始地址。
+
+```
+#define __VMEMMAP_BASE_L4	0xffffea0000000000UL
+#define VMEMMAP_START		__VMEMMAP_BASE_L4
+#define vmemmap ((struct page *)VMEMMAP_START)
+#define __pfn_to_page(pfn)	(vmemmap + (pfn))
+```
+
+不过这个感觉有点危险，如果那天page里面又塞了啥东西，那就要爆了。不过也由此可见，page里面应该不让轻易随便改动，尤其是加新的值。
 
 [1]: https://lwn.net/Articles/134804/
+[2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/arch/x86/x86_64/mm.rst
