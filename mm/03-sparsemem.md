@@ -239,4 +239,10 @@ struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
 * 标注哪些section是存在的
 * 给存在的section分配memmap/usermap
 
+# 常用API
+
+## for_each_present_section_nr(start, section_nr)
+
+
+
 [1]: https://lwn.net/Articles/134804/
