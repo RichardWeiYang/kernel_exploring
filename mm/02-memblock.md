@@ -80,28 +80,29 @@ start_kernel()
             memblock_add()
                 memblock_add_range(&memblock.memory, base, size, MAX_NUMNODES, 0)
             memblock_dump_all()
-        init_mem_mapping() // 设置内核页表
+        init_mem_mapping()                   // 设置内核页表
         memblock_set_current_limit(get_max_mapped())
 
         initmem_init() -> x86_numa_init() -> numa_init()
             memblock_set_node(0, ULLONG_MAX, &memblock.memory, MAX_NUMNODES) // 默认都先归到node MAX_NUMNODES
             memblock_set_node(0, ULLONG_MAX, &memblock.reserved, MAX_NUMNODES)
             numa_register_memblks()
-                memblock_set_node() // 再根据numa信息设置真实的node
-                alloc_node_data(nid) // allocate pgdata for each node
+                memblock_set_node()          // 再根据numa信息设置真实的node
+                alloc_node_data(nid)         // allocate pgdata for each node
         x86_init.paging.pagetable_init() -> paging_init()
             sparse_init()
             zone_size_init()
+                free_area_init()             // 初始化pgdat
     mm_core_init()
         mem_init()
-            memblock_free_all() // release free pages to buddy, including memblock data structure
+            memblock_free_all()              // release free pages to buddy, including memblock data structure
     rest_init()
         kernel_init()
             kernel_init_freeable()
                 page_alloc_init_late()
-                    memblock_discard() // discard region array
+                    memblock_discard()       // discard region array
             free_initmem()
-                free_kernel_image_pages() // 释放__init标记的，在__init_begin/end之间的内存
+                free_kernel_image_pages()    // 释放__init标记的，在__init_begin/end之间的内存
 ```
 
 在x86平台，这个工作就交给了 e820__memblock_setup()，从e820信息中构建了memblock。

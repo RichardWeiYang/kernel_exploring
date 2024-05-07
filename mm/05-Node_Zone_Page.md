@@ -121,6 +121,19 @@ index 35dcf33..f974112 100644
  		realtotalpages += real_size;
 ```
 
+PS: free_area_init()中也有相关的日志输出。
+
+# 初始化pgdat
+
+既然每个node都由pgdat表示，那么就需要看看这部分信息是如何初始化的。
+
+函数free_area_init是负责初始化的，这里我们主要观察该函数的行为。而该函数在整个系统初始化过程的位置参见[memblock][2]中的**初始化流程**。
+
+```
+free_area_init()
+
+```
+
 # Page在哪？
 
 刚才我们已经看到了，内存被划分为node，每个node又划分成了zone。虽然不是每个zone都有内存，但是内核把page相关的信息还是保存在了zone内。
@@ -304,3 +317,4 @@ Node Fallback list
 
 
 [1]: https://www.kernel.org/doc/gorman/html/understand/understand005.html
+[2]: /mm/02-memblock.md
