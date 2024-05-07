@@ -123,8 +123,8 @@ struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
 ```
     mem_section
     +-----------------------------+
-    |pageblock_flags              |
-    |   (unsigned long *)         |
+    |usage                        |
+    |   (mem_section_usage *)     |
     |                             |
     |                             |
     +-----------------------------+         mem_map[PAGES_PER_SECTION]
@@ -161,6 +161,40 @@ struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
 **page结构体在这里**
 
 重要的事情说三遍。
+
+## section中的usage
+
+接着我们看看结构中的另一个成员usage(struct mem_section_usage)
+
+```
+     mem_section
+     +-----------------------------+
+     |section_mem_map              |
+     |   (unsigned long)           |
+     |                             |
+     +-----------------------------+
+     |usage                        |
+     |   (mem_section_usage *)     |
+     |   +-------------------------+
+     |   |subsection_map           |   SUBSECTIONS_PER_SECTION =
+     |   |    (bitmap)             |       (1UL << (SECTION_SIZE_BITS - SUBSECTION_SHIFT))
+     |   |                         |       = (1UL << (27 - 21))
+     |   |                         |
+     |   |                         |
+     |   |                         |    [(1UL << (PFN_SECTION_SHIFT - pageblock_order))]
+     |   |                         |    each 4bits represents a pageblock type
+     |   |pageblock_flags[0]       |    get_pfnblock_flags_mask() / get_pfnblock_migratetype()
+     |   |    (unsigned long)   ---|--->+----+----+----+---...---+----+----+
+     +---+-------------------------+    |    |    |    |         |    |    |
+                                        |    |    |    |         |    |    |
+                                        +----+----+----+---...---+----+----+
+```
+
+在这个结构中我们可以看到，一个section还可以在两个概念上进一步划分：
+
+* subsection: 每2MB作为一个subsection
+* pageblock:  pageblock_order作为一个pageblock
+
 
 # 变慢了么？
 
