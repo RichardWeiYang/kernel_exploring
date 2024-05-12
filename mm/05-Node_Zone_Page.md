@@ -131,8 +131,30 @@ PS: free_area_init()中也有相关的日志输出。
 
 ```
 free_area_init()
+    free_area_init_node(nid)            // 初始化node/zone，设置每个node/zone的范围
+        calculate_node_totalpages()
+        free_area_init_core(pgdat)
+            zone_init_internals(zone, j, nid, freesize)
+            init_currently_empty_zone(zone, zone_start_pfn, size)
+                zone_init_free_lists(zone)
+                zone->initialized = 1
 
+    memmap_init()                       // 初始化page struct
+        memmap_init_zone_range(zone, start_pfn, end_pfn, &hole_pfn)
+            memmap_init_range(, MEMINIT_EARLY, NULL, MIGRATE_MOVABLE)
+                __init_single_page(page, pfn, zone, nid)
+                __SetPageReserved(page), if context == MEMINIT_HOTPLUG
+                set_pageblock_migratetype(page, MIGRATE_MOVABLE)
+            init_unavailable_range(*hole_pfn, start_pfn, zone_id, nid)
+                __init_single_page(page, pfn, zone, nid)
+                __SetPageReserved(page)
 ```
+
+## 相关日志
+
+内核启动过程中，我们可以通过free_area_init()中输出的日志观察每个node/zone所使用的区域。
+
+日志中搜索的关键字是："Zone ranges:"， "Early memory node ranges"。
 
 # Page在哪？
 
