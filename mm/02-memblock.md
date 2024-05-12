@@ -94,6 +94,7 @@ start_kernel()
             zone_size_init()
                 free_area_init()             // 初始化pgdat
     mm_core_init()
+        build_all_zonelists(NULL)            // 构造page allocator的zonelist
         mem_init()
             memblock_free_all()              // release free pages to buddy, including memblock data structure
     rest_init()

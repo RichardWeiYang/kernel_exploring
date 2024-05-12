@@ -251,6 +251,22 @@ OK，好像一句话就说完了。还是亲眼渐渐zonelist的模样吧。
 
 所以每个node_data上都有自己的zonelist，用来表示在该numa节点上分配内存时如何按照zone找到空闲内存的顺序。
 
+## 构造zonelist的代码在哪里
+
+虽然构造zonelist的代码不复杂，不过我们还是看看这部分是在哪里做的。
+
+```
+mm_core_init()
+    build_all_zonelists(NULL)
+        build_all_zonelists_init()
+            __build_all_zonelists(NULL)
+                write_seqlock_irqsave(&zonelist_update_seq, flags);
+                build_zonelists(pgdat);
+                    build_zonelists_in_node_order(pgdat, node_order, nr_nodes);
+                    build_thisnode_zonelists(pgdat);
+                write_sequnlock_irqrestore(&zonelist_update_seq, flags);
+```
+
 ## 如何做到节点按照round robin排序
 
 commit 54d032ced98378bcb9d32dd5e378b7e402b36ad8 描述了之前内核中的一个bug。在多numa节点情况下，zonelist并没有按照round robin的顺序排列，从而导致了内存访问差异。我们来看下原因。
