@@ -14,14 +14,19 @@ memblock作为系统启动初期的内存管理系统，在系统启动后就显
 
 这个过程就在free_all_bootmem()函数中。
 
-```
-    start_kernel()
-        mm_init()
-            mem_init()
-                memblock_free_all()
-                    free_low_memory_core_early()
-                        ...
-                        __free_pages_core()
+```c
+start_kernel()
+    mm_core_init()
+        mem_init()
+            memblock_free_all()
+                free_unused_memmap()                // 释放内存空洞对应的page struct
+                reset_all_zones_managed_pages()     // 清除临时的managed_pages
+                free_low_memory_core_early()
+                    memblock_clear_hotplug(0, -1);
+                    memmap_init_reserved_pages()    // set PageReserved
+                    __free_memory_core()
+                        __free_pages_memory(start_pfn, end_pfn)
+                            memblock_free_pages()
 ```
 
 在这个过程中你可以看到熟悉的for_each_free_mem_range()。对了，这就是遍历memory_block的内存信息，来填充page结构体的过程了。
