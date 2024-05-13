@@ -88,11 +88,13 @@ start_kernel()
             memblock_set_node(0, ULLONG_MAX, &memblock.reserved, MAX_NUMNODES)
             numa_register_memblks()
                 memblock_set_node()          // 再根据numa信息设置真实的node
-                alloc_node_data(nid)         // allocate pgdata for each node
+                alloc_node_data(nid)         // allocate pgdata for each node with memory
+                    node_set_online(nid)     // 因为只有有内存的node才会分配，所以这里online的都是有内存的
         x86_init.paging.pagetable_init() -> paging_init()
             sparse_init()
             zone_size_init()
                 free_area_init()             // 初始化pgdat
+                    node_set_state(nid, N_MEMORY) // 存在可用内存的节点标上MEMORY
     mm_core_init()
         build_all_zonelists(NULL)            // 构造page allocator的zonelist
         mem_init()

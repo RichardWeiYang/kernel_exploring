@@ -138,6 +138,7 @@ free_area_init()
             init_currently_empty_zone(zone, zone_start_pfn, size)
                 zone_init_free_lists(zone)
                 zone->initialized = 1
+    node_set_state(nid, N_MEMORY), if pgdat->node_present_pages
 
     memmap_init()                       // 初始化page struct
         memmap_init_zone_range(zone, start_pfn, end_pfn, &hole_pfn)
