@@ -195,6 +195,8 @@ struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
 * subsection: 每2MB作为一个subsection
 * pageblock:  pageblock_order作为一个pageblock
 
+其中subsection_map在函数subsection_map_init()中初始化。
+而pageblock_flags在memmap_init()过程中设置。
 
 # 变慢了么？
 
