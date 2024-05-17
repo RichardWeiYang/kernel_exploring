@@ -22,7 +22,7 @@ start_kernel()
                 free_unused_memmap()                // 释放内存空洞对应的page struct
                 reset_all_zones_managed_pages()     // 清除临时的managed_pages
                 free_low_memory_core_early()
-                    memblock_clear_hotplug(0, -1);
+                    memblock_clear_hotplug(0, -1)
                     memmap_init_reserved_pages()    // set PageReserved
                     __free_memory_core()
                         __free_pages_memory(start_pfn, end_pfn)
@@ -42,6 +42,49 @@ start_kernel()
 那最后释放到哪里了呢？
 
 对了，就是zone->free_area[order].free_list上了。
+
+## 释放流程
+
+整个流程比较长，分开看。下面这部分到拿到zone的锁。
+
+```c
+__free_pages_core(page, order)
+    __ClearPageReserved(p)
+    set_page_count(p, 0)
+    __free_pages_ok(page, order, FPI_TO_TAIL)
+        free_pages_prepare(page, order)
+        migratetype = get_pfnblock_migratetype(page, pfn)
+        free_one_page(zone, page, pfn, order, migratetype, fpi_flags)
+            spin_lock_irqsave(&zone->lock, flags)                 // free_list的锁在zone这里
+            __free_one_page(page, pfn, zone, order, migratetype, fpi_flags)
+            spin_unlock_irqrestore(&zone->lock, flags)
+```
+
+这部分是已经拿到锁之后，判断是否要和相邻的buddy合并。
+
+```c
+__free_one_page(page, pfn, zone, order, migratetype, fpi_flags)
+    __mod_zone_freepage_state(zone, 1 << order, migratetype)      // 增加NR_FREE_PAGES计数
+
+    buddy = find_buddy_page_pfn(page, pfn, order, &buddy_pfn)
+        __buddy_pfn = __find_buddy_pfn(pfn, order)
+            return page_pfn ^ (1 << order)
+        buddy = page + (__buddy_pfn - pfn)
+        page_is_buddy(page, buddy, order)
+    del_page_from_free_list(buddy, zone, order)                   // 如果buddy刚好空闲，先把他从free_list上摘下来
+    combined_pfn = buddy_pfn & pfn
+    page = page + (combined_pfn - pfn)
+    pfn = combined_pfn
+    order++
+
+done_merging:
+    set_buddy_order(page, order)
+        set_page_private(page, order)
+        __SetPageBuddy(page)
+
+    add_to_free_list[_tail](page, zone, order, migratetype)       // 添加到free_list上
+```
+
 
 # 分配
 

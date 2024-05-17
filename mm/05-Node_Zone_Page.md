@@ -176,7 +176,7 @@ free_area_init()
       |   (struct free_area)         |
       |   +--------------------------+
       |   |nr_free                   |  number of available pages
-      |   |(unsigned long)           |  in this zone
+      |   |(unsigned long)           |  in this free_area[] list
       |   |                          |
       |   +--------------------------+
       |   |                          |           free_area[0]
