@@ -12,7 +12,7 @@ memblock作为系统启动初期的内存管理系统，在系统启动后就显
 
 众所周知，在内核中我们使用page结构体来表示物理页。在SPARSEMEM这篇中我们也对page结构体的存储位置做了探索。那在最开始的时候，这个结构体是空的。那什么时候系统把物理实际存在的页面和这个page结构体对应上呢？系统是什么时候确认系统到底是有那些page可以使用的呢？如何把page结构体保存到相应的Zone结构体中的呢？
 
-这个过程就在free_all_bootmem()函数中。
+这个过程就在memblock_free_all()函数中。
 
 ```c
 start_kernel()
@@ -30,6 +30,8 @@ start_kernel()
 ```
 
 在这个过程中你可以看到熟悉的for_each_free_mem_range()。对了，这就是遍历memory_block的内存信息，来填充page结构体的过程了。
+
+PS: 当有了defer_init后，大部分的page struct初始化由单独的线程调用deferred_init_memmap()[延迟初始化][4]。
 
 # 释放
 
@@ -317,3 +319,4 @@ check_new_page()
 [1]: http://blog.csdn.net/richardysteven/article/details/52332040
 [2]: /mm/05-Node_Zone_Page.md
 [3]: /virtual_mm/02-thp_mapcount.md
+[4]: /mm/54-defer_init.md
