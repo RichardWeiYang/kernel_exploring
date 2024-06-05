@@ -29,7 +29,7 @@ Page结构体需要初始化后才能加入到buddy分配器供内核中各个�
                      free_area_init_core()
                          memmap_init() -> memmap_init_zone()
                              __init_single_page()             (2)
-     mm_init() -> mem_init()
+     mm_core_init() -> mem_init()
          memblock_free_all()
              free_low_memory_core_early()
                  __free_memory_core() -> __free_pages_memory()
@@ -62,14 +62,14 @@ Page结构体要经历三个过程，被分配，被初始化，添加到buddy�
                          memmap_init() -> memmap_init_zone()
                              defer_init()                     (1)
                              __init_single_page()
-     mm_init() -> mem_init()
+     mm_core_init() -> mem_init()
          memblock_free_all()
              free_low_memory_core_early()
                  __free_memory_core() -> __free_pages_memory()
                      memblock_free_pages()
                          early_page_uninitialised()           (2)
                          __free_pages_core()
-     arch_call_rest_init() -> rest_init()
+     rest_init()
          pid = kernel_thread(kernel_init, NULL, CLONE_FS);
              kernel_init_freeable() -> page_alloc_init_late()
                  deferred_init_memmap()                       (3)
@@ -77,7 +77,7 @@ Page结构体要经历三个过程，被分配，被初始化，添加到buddy�
 
 在上面的代码片段中可以看到，在1，2的地方分别增加了判断，是否要跳过这部分的初始化。
 
-接着在3的位置启用了一个内核线程来初始化剩下的page结构体。
+接着在3的位置启用了一个内核线程来初始化剩下的page结构体，并将page释放到buddy system。
 
 好了，这件事情就是这么简单～
 
