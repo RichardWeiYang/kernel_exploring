@@ -94,7 +94,9 @@ start_kernel()
             sparse_init()
             zone_size_init()
                 free_area_init()             // 初始化pgdat
+                    free_area_init_node()    // call for each pgdat
                     node_set_state(nid, N_MEMORY) // 存在可用内存的节点标上MEMORY
+                    memmap_init()            // 初始化page struct，__init_single_page()
     mm_core_init()
         build_all_zonelists(NULL)            // 构造page allocator的zonelist
         mem_init()
