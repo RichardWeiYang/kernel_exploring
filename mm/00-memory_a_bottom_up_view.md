@@ -42,11 +42,7 @@ Slub分配器
 
 那内核中是如何把这两个信息保存起来，并用来指导内存非配的呢？
 
-首先，系统为了获取NUMA信息，新增了numa_meminfo结构从硬件中获取NUMA信息，然后在转换到了memblock层。
-
-[NUMA信息获取][4]
-
-接下来就是大名鼎鼎的pg_data_t结构体出场了。所有的页分配工作都是基于这个数据结构的信息所作出的。
+这就需要大名鼎鼎的pg_data_t结构体出场了。所有的页分配工作都是基于这个数据结构的信息所作出的。
 
 [Node-Zone-Page][5]
 
@@ -97,7 +93,6 @@ Slub分配器
 [1]: /mm/01-e820_retrieve_memory_from_HW.md
 [2]: /mm/02-memblock.md
 [3]: /mm/03-sparsemem.md
-[4]: /mm/04-numa_node_info.md
 [5]: /mm/05-Node_Zone_Page.md
 [6]: /mm/06-page_alloc.md
 [7]: /mm/07-per_cpu_pageset.md

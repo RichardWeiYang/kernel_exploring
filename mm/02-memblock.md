@@ -147,6 +147,143 @@ void __init e820__memblock_setup(void)
 
 通过他就建立了硬件信息和memblock之间的联系。在x86平台上，不断从e820中获取内存底层信息，并添加到memblock中。你看是不是很简单了。
 
+## 增加numa信息
+
+[NUMA(Non-uniform memory access)][6]是一个高级玩意，咱先来看看维基百科上的定义：
+
+is a computer memory design used in multiprocessing, where the memory access time depends on the memory location relative to the processor. Under NUMA, a processor can access its own local memory faster than non-local memory (memory local to another processor or memory shared between processors). The benefits of NUMA are limited to particular workloads, notably on servers where the data are often associated strongly with certain tasks or users.
+
+总的一句话来讲，就是分配内存时需要区别对待。不同区域的内存我们叫做不同的节点，节点之间我们又定义了个“距离”的概念用来衡量内存访问时间的差异。
+
+好了，有了基本的概念，我们来看看linux内核中是如何获得物理内存的NUMA信息。说白了就是怎么知道一块内存对应到哪个NUMA节点。
+
+在x86平台，这个工作分成两步
+
+* 将numa信息保存到numa_meminfo
+* 将numa_meminfo映射到memblock结构
+
+所以，前面我们看到的memblock信息上是没有numa信息的，在x86上这部分信息是等到numa初始化时再把这部分信息加到memblock中的。
+
+在上面的流程中，我们可以搜x86_numa_init()，看看这部分初始化在全局中的顺序。
+
+### 将numa信息保存到numa_meminfo
+
+在x86架构上，numa信息第一次获取是通过acpi或者是读取北桥上的信息。具体的函数是numa_init()。不管是哪种方式，numa相关的信息都最后保存在了numa_meminfo这个数据结构中。
+
+这个数据结构和memblock长得很像，展开看就是一个数组，每个元素记录了一段内存的起止地址和node信息。
+
+```
+    numa_meminfo
+    +------------------------------+
+    |nr_blks                       |
+    |    (int)                     |
+    +------------------------------+
+    |blk[NR_NODE_MEMBLKS]          |
+    |    (struct numa_memblk)      |
+    |    +-------------------------+
+    |    |start                    |
+    |    |end                      |
+    |    |   (u64)                 |
+    |    |nid                      |
+    |    |   (int)                 |
+    +----+-------------------------+
+```
+
+在这个过程中使用的就是这个函数添加的numa_meminfo数据结构。
+
+* numa_add_memblk()
+
+这个函数非常简单，而且粗暴。
+
+### 将numa_meminfo映射到memblock结构
+
+内核获取了numa_meminfo之后并没有如我们想象一般直接拿来用了。虽然此时给每个numa节点生成了我们以后会看到的node_data数据结构，但此时并没有直接使能它。
+
+memblock是内核初期内存分配器，所以当内核获取了numa信息首先是把相关的信息映射到了memblock结构中，使其具有numa的knowledge。这样在内核初期分配内存时，也可以分配到更近的内存了。
+
+在这个过程中有两个比较重要的函数
+
+* numa_cleanup_meminfo()
+* numa_register_memblks()
+
+前者主要用来过滤numa_meminfo结构，合并同一个node上的内存。
+
+后者就是把numa信息映射到memblock了。除此之外，顺便还把之后需要的node_data给分配了，为后续的页分配器做好了准备。
+
+### 观察memblock的变化
+
+memblock的调试信息默认没有打开，所以要观察的话需要传入内核启动参数"memblock=debug"。
+
+进入系统后，输入命令"dmesg | grep -A 9 MEMBLOCK"可以看到
+
+```
+[    0.000000] MEMBLOCK configuration:
+[    0.000000]  memory size = 0x00000001f9c4e800 reserved size = 0x0000000014aab27c
+[    0.000000]  memory.cnt  = 0x7
+[    0.000000]  memory[0x0]	[0x0000000000001000-0x000000000009cfff], 0x000000000009c000 bytes flags: 0x0
+[    0.000000]  memory[0x1]	[0x0000000000100000-0x00000000ba5b1fff], 0x00000000ba4b2000 bytes flags: 0x0
+[    0.000000]  memory[0x2]	[0x00000000ba5b9000-0x00000000bad8dfff], 0x00000000007d5000 bytes flags: 0x0
+[    0.000000]  memory[0x3]	[0x00000000bafb6000-0x00000000ca8a1fff], 0x000000000f8ec000 bytes flags: 0x0
+[    0.000000]  memory[0x4]	[0x00000000ca93a000-0x00000000ca977fff], 0x000000000003e000 bytes flags: 0x0
+[    0.000000]  memory[0x5]	[0x00000000cafff000-0x00000000caffffff], 0x0000000000001000 bytes flags: 0x0
+[    0.000000]  memory[0x6]	[0x0000000100000000-0x000000022f5fffff], 0x000000012f600000 bytes flags: 0x0
+--
+[    0.000000] MEMBLOCK configuration:
+[    0.000000]  memory size = 0x00000001f9c4e800 reserved size = 0x0000000014b29800
+[    0.000000]  memory.cnt  = 0x7
+[    0.000000]  memory[0x0]	[0x0000000000001000-0x000000000009cfff], 0x000000000009c000 bytes on node 0 flags: 0x0
+[    0.000000]  memory[0x1]	[0x0000000000100000-0x00000000ba5b1fff], 0x00000000ba4b2000 bytes on node 0 flags: 0x0
+[    0.000000]  memory[0x2]	[0x00000000ba5b9000-0x00000000bad8dfff], 0x00000000007d5000 bytes on node 0 flags: 0x0
+[    0.000000]  memory[0x3]	[0x00000000bafb6000-0x00000000ca8a1fff], 0x000000000f8ec000 bytes on node 0 flags: 0x0
+[    0.000000]  memory[0x4]	[0x00000000ca93a000-0x00000000ca977fff], 0x000000000003e000 bytes on node 0 flags: 0x0
+[    0.000000]  memory[0x5]	[0x00000000cafff000-0x00000000caffffff], 0x0000000000001000 bytes on node 0 flags: 0x0
+[    0.000000]  memory[0x6]	[0x0000000100000000-0x000000022f5fffff], 0x000000012f600000 bytes on node 0 flags: 0x0
+```
+
+注意看每个memory条目的最后，现在每个memblock上都多了一个输出"on node 0"。这就是物理内存的NUMA信息。当然我这里只有一个node，如果你的系统上有多个node那就可以看到不一样的信息了。
+
+#### 插播一条我的补丁
+
+在code review过程中，发现numa_nodemask_from_meminfo()的作用其实可以被别的东西替代。所以我干脆提了个补丁把这个挪走了。
+
+补丁的id是：[474aeffd88b87746a75583f356183d5c6caa4213][7]
+
+不过可惜的是，这个补丁还有点小问题。新的改进也写好了，但是到现在还没有合入。社区嘛，你懂的。
+
+### 重要的全局变量
+
+#### node_stats[NR_NODE_STATES]
+
+这是一个nodemask_t类型的数组，其中每一个数组表达一个纬度的信息。
+
+```
+enum node_states {
+	N_POSSIBLE,		/* The node could become online at some point */
+	N_ONLINE,		/* The node is online */
+	N_NORMAL_MEMORY,	/* The node has regular memory */
+#ifdef CONFIG_HIGHMEM
+	N_HIGH_MEMORY,		/* The node has regular or high memory */
+#else
+	N_HIGH_MEMORY = N_NORMAL_MEMORY,
+#endif
+	N_MEMORY,		/* The node has memory(regular, high, movable) */
+	N_CPU,		/* The node has one or more cpus */
+	N_GENERIC_INITIATOR,	/* The node has one or more Generic Initiators */
+	NR_NODE_STATES
+};
+```
+
+其中有两个常用的，被单独重命名。
+
+```
+#define node_online_map 	node_states[N_ONLINE]
+#define node_possible_map 	node_states[N_POSSIBLE]
+```
+
+#### node_data[MAX_NUMNODES]
+
+每个numa节点的pgdata，就是后面内存管理的重要数据结构。
+
 ## 剔除已经占用的部分
 
 随着代码的阅读，发现之前遗漏了非常重要的一部分。
@@ -357,8 +494,11 @@ memblock作为启动初期的代码，不是很好调试。所以社区在tools/
 
 也可以 make NUMA=1，测试有numa的情况。
 
+
 [1]: https://lkml.org/lkml/2010/7/13/114
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/mm/memblock.c?id=95f72d1ed41a66f1c1c29c24d479de81a0bea36f
 [3]: https://0xax.gitbooks.io/linux-insides/content/MM/linux-mm-1.html
 [4]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=7c8c6b9776fb41134d87ef50706a777a45d61cd4
 [5]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=784656f9c680d334e7b4cdb6951c5c913e5a26bf
+[6]: https://en.wikipedia.org/wiki/Non-uniform_memory_access
+[7]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=474aeffd88b87746a75583f356183d5c6caa4213
