@@ -123,7 +123,7 @@ index 35dcf33..f974112 100644
 
 PS: free_area_init()中也有相关的日志输出。
 
-# 初始化pgdat
+# 划分node/zone的边界
 
 既然每个node都由pgdat表示，那么就需要看看这部分信息是如何初始化的。
 
@@ -132,7 +132,7 @@ PS: free_area_init()中也有相关的日志输出。
 ```
 free_area_init()
     free_area_init_node(nid)            // 初始化node/zone，设置每个node/zone的范围
-        calculate_node_totalpages()
+        calculate_node_totalpages()     // 计算出node/zone的大小和边界
         free_area_init_core(pgdat)
             zone_init_internals(zone, j, nid, freesize)
             init_currently_empty_zone(zone, zone_start_pfn, size)
