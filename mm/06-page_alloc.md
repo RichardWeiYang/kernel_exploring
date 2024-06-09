@@ -91,68 +91,6 @@ PS: 当有了defer_init后，大部分的page struct初始化由单独的线程�
 
 这其实就是我们通常说的buddy system。分配的时候找到对应的zone，查看是否有可以使用的页面。如果指定大小的页面没有，就去更高阶的链表上找。
 
-# 释放
-
-通常我们都是先讲分配，再讲释放的。但是这次要到过来。为什么呢，因为在free_all_bootmem()中就是调用了内存释放的方法来初始化page结构的。所以还是先来看看释放吧。
-
-我们通常使用的函数是free_pages()。但是最后都调用到了函数__free_one_page()。这个函数其实比较简单，就是算的东西稍微有点绕。我们都知道页分配器中使用的是伙伴系统，也就是相邻的两个页是一对儿。所以在释放的时候，会去判断自己的伙伴是不是也是空闲的。如果是的话，那就做合并。且继续判断。
-
-关于伙伴查找的算法，后面详细讲。有兴趣的可以仔细看。
-
-那最后释放到哪里了呢？
-
-对了，就是zone->free_area[order].free_list上了。
-
-## 释放流程
-
-整个流程比较长，分开看。下面这部分到拿到zone的锁。
-
-```c
-__free_pages_core(page, order)
-    __ClearPageReserved(p)
-    set_page_count(p, 0)
-    __free_pages_ok(page, order, FPI_TO_TAIL)
-        free_pages_prepare(page, order)
-        migratetype = get_pfnblock_migratetype(page, pfn)
-        free_one_page(zone, page, pfn, order, migratetype, fpi_flags)
-            spin_lock_irqsave(&zone->lock, flags)                 // free_list的锁在zone这里
-            __free_one_page(page, pfn, zone, order, migratetype, fpi_flags)
-            spin_unlock_irqrestore(&zone->lock, flags)
-```
-
-这部分是已经拿到锁之后，判断是否要和相邻的buddy合并。
-
-```c
-__free_one_page(page, pfn, zone, order, migratetype, fpi_flags)
-    __mod_zone_freepage_state(zone, 1 << order, migratetype)      // 增加NR_FREE_PAGES计数
-
-    buddy = find_buddy_page_pfn(page, pfn, order, &buddy_pfn)
-        __buddy_pfn = __find_buddy_pfn(pfn, order)
-            return page_pfn ^ (1 << order)
-        buddy = page + (__buddy_pfn - pfn)
-        page_is_buddy(page, buddy, order)
-    del_page_from_free_list(buddy, zone, order)                   // 如果buddy刚好空闲，先把他从free_list上摘下来
-    combined_pfn = buddy_pfn & pfn
-    page = page + (combined_pfn - pfn)
-    pfn = combined_pfn
-    order++
-
-done_merging:
-    set_buddy_order(page, order)
-        set_page_private(page, order)
-        __SetPageBuddy(page)
-
-    add_to_free_list[_tail](page, zone, order, migratetype)       // 添加到free_list上
-```
-
-# 分配
-
-页分配的核心函数是__alloc_pages_nodemask()。正如函数的注释上写的"This is the 'heart' of the zoned buddy allocator."。
-
-在[Node->Zone->Page][2]中我们已经看到了，内存被分为了node，zone来管理。这么管理的目的也就是为了在分配的时候，能能够找到合适的内存。所以在分配的时候，就是按照优先级搜索node和zone，如果找到匹配的zone则在该zone的free_area链表中取下一个。
-
-和释放内存对称，分配的时候也可能会分配到高阶的page。如果发生这种情况，则会将高阶部分放回到对应的free_area中。
-
 # 伙伴系统
 
 ## 你不是一个人
@@ -397,6 +335,68 @@ Node Fallback list
 
 从历史记录来看，最开始是有锁的。到现在其实把锁去掉了。
 
+# 释放
+
+通常我们都是先讲分配，再讲释放的。但是这次要到过来。为什么呢，因为在free_all_bootmem()中就是调用了内存释放的方法来初始化page结构的。所以还是先来看看释放吧。
+
+我们通常使用的函数是free_pages()。但是最后都调用到了函数__free_one_page()。这个函数其实比较简单，就是算的东西稍微有点绕。我们都知道页分配器中使用的是伙伴系统，也就是相邻的两个页是一对儿。所以在释放的时候，会去判断自己的伙伴是不是也是空闲的。如果是的话，那就做合并。且继续判断。
+
+关于伙伴查找的算法，后面详细讲。有兴趣的可以仔细看。
+
+那最后释放到哪里了呢？
+
+对了，就是zone->free_area[order].free_list上了。
+
+## 各种释放接口
+
+内核中有很多释放内存的地方，这里我们总结一下。
+
+* 核心 __free_one_page，最后都要通过这个函数将内存放到free_list上
+* __free_page_core，这是将内存从memblock/hotplug时，加入到buddy system
+* free_one_page 及其延伸接口 free_unref_page/free_unref_folio
+
+### __free_one_page流程
+
+这个是最内存的释放函数了，基本所有的page都是靠他释放到free_list上的。
+
+```c
+__free_one_page(page, pfn, zone, order, migratetype, fpi_flags)
+    __mod_zone_freepage_state(zone, 1 << order, migratetype)      // 增加NR_FREE_PAGES计数
+
+    buddy = find_buddy_page_pfn(page, pfn, order, &buddy_pfn)
+        __buddy_pfn = __find_buddy_pfn(pfn, order)
+            return page_pfn ^ (1 << order)
+        buddy = page + (__buddy_pfn - pfn)
+        page_is_buddy(page, buddy, order)
+    del_page_from_free_list(buddy, zone, order)                   // 如果buddy刚好空闲，先把他从free_list上摘下来
+    combined_pfn = buddy_pfn & pfn
+    page = page + (combined_pfn - pfn)
+    pfn = combined_pfn
+    order++
+
+done_merging:
+    set_buddy_order(page, order)
+        set_page_private(page, order)
+        __SetPageBuddy(page)
+
+    add_to_free_list[_tail](page, zone, order, migratetype)       // 添加到free_list上
+```
+
+### __free_page_core
+
+这是个比较特殊的接口，从memblock/hotplug来的内存通过这个接口释放到buddy system。
+
+### free_one_page(free_unref_[page|foio])
+
+这个和__free_one_page的差别在与可能会释放到per_cpu_pageset。
+
+# 分配
+
+页分配的核心函数是__alloc_pages_nodemask()。正如函数的注释上写的"This is the 'heart' of the zoned buddy allocator."。
+
+在[Node->Zone->Page][2]中我们已经看到了，内存被分为了node，zone来管理。这么管理的目的也就是为了在分配的时候，能能够找到合适的内存。所以在分配的时候，就是按照优先级搜索node和zone，如果找到匹配的zone则在该zone的free_area链表中取下一个。
+
+和释放内存对称，分配的时候也可能会分配到高阶的page。如果发生这种情况，则会将高阶部分放回到对应的free_area中。
 
 # Compound Page
 
