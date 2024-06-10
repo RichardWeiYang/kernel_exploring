@@ -80,34 +80,38 @@ start_kernel()
             memblock_add()
                 memblock_add_range(&memblock.memory, base, size, MAX_NUMNODES, 0)
             memblock_dump_all()
-        init_mem_mapping()                   // 设置内核页表
+        init_mem_mapping()                           // 设置内核页表
         memblock_set_current_limit(get_max_mapped())
 
         initmem_init() -> x86_numa_init() -> numa_init()
             memblock_set_node(0, ULLONG_MAX, &memblock.memory, MAX_NUMNODES) // 默认都先归到node MAX_NUMNODES
             memblock_set_node(0, ULLONG_MAX, &memblock.reserved, MAX_NUMNODES)
             numa_register_memblks()
-                memblock_set_node()          // 再根据numa信息设置真实的node
-                alloc_node_data(nid)         // allocate pgdata for each node with memory
-                    node_set_online(nid)     // 因为只有有内存的node才会分配，所以这里online的都是有内存的
+                memblock_set_node()                  // 再根据numa信息设置真实的node
+                alloc_node_data(nid)                 // allocate pgdata for each node with memory
+                    node_set_online(nid)             // 因为只有有内存的node才会分配，所以这里online的都是有内存的
         x86_init.paging.pagetable_init() -> paging_init()
             sparse_init()
             zone_size_init()
-                free_area_init()             // 初始化pgdat
-                    free_area_init_node()    // call for each pgdat
-                    node_set_state(nid, N_MEMORY) // 存在可用内存的节点标上MEMORY
-                    memmap_init()            // 初始化page struct，__init_single_page()
+                free_area_init()                     // 初始化pgdat
+                    free_area_init_node()            // call for each pgdat
+                    node_set_state(nid, N_MEMORY)    // 存在可用内存的节点标上MEMORY
+                    memmap_init()                    // 初始化page struct，__init_single_page()
     mm_core_init()
-        build_all_zonelists(NULL)            // 构造page allocator的zonelist
+        build_all_zonelists(NULL)                    // 构造page allocator的zonelist
         mem_init()
-            memblock_free_all()              // release free pages to buddy, including memblock data structure
+            memblock_free_all()
+                reset_all_zones_managed_pages()
+                free_low_memory_core_early()
+                    memmap_init_reserved_pages()     // 设置PageReserved
+                    __free_memory_core()             // release free pages to buddy
     rest_init()
         kernel_init()
             kernel_init_freeable()
                 page_alloc_init_late()
-                    memblock_discard()       // discard region array
+                    memblock_discard()               // discard region array
             free_initmem()
-                free_kernel_image_pages()    // 释放__init标记的，在__init_begin/end之间的内存
+                free_kernel_image_pages()            // 释放__init标记的，在__init_begin/end之间的内存
 ```
 
 在x86平台，这个工作就交给了 e820__memblock_setup()，从e820信息中构建了memblock。
