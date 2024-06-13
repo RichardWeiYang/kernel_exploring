@@ -85,3 +85,11 @@ early_param("memblock", early_memblock);
 也就是定义了一个obs_kernel_param结构，而且还是放在.init.setup这个section的。
 
 好了，这样就联系起来了。do_early_param会遍历.init.setup这个section中的数组，判断符合条件，就会运行对应的setup_func。对memblock来说，也就是early_memblock了。
+
+# 非early param
+
+在do_early_param中，我们看到只有p->early的内核参数才会在这里执行。但是用__setup()定义的结构early并没有置1,那问题来了，这部分的参数是怎么被解析的呢？
+
+这个查找着实花了点时间，主要是因为当前内核认为这种参数是要淘汰的定义方式了。所以藏在了函数unknown_bootoption中的obsolete_checksetup()中。
+
+其过程和之前一样，也是遍历__setup_start/__setup_end，但只运行early=0的结构。
