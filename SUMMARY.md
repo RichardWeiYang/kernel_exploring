@@ -16,6 +16,7 @@
   * [kbuild系统浅析](brief_tutorial_on_kbuild/13_root_makefile.md)
 * [启动时的小秘密](bootup/00_index.md)
   * [INIT_CALLS的秘密](bootup/01_init_call.md)
+  * [内核参数](bootup/02_command_line_parse.md)
 * [内核加载全流程](load_kernel/00_index.md)
   * [bootloader如何加载bzImage](load_kernel/02_how_bzImage_loaded.md)
   * [内核压缩与解压](load_kernel/04_compress_decompress_kernel.md)

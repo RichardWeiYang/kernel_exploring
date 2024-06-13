@@ -10,4 +10,9 @@
 
 [INIT_CALLS的秘密][1]
 
+# 内核参数
+
+启动时我们可以通过[内核参数][2]来调整系统行为。
+
 [1]: /bootup/01_init_call.md
+[2]: /bootup/02_command_line_parse.md
