@@ -392,7 +392,7 @@ done_merging:
 
 # 分配
 
-页分配的核心函数是__alloc_pages_nodemask()。正如函数的注释上写的"This is the 'heart' of the zoned buddy allocator."。
+页分配的核心函数是__alloc_pages_noprof()。正如函数的注释上写的"This is the 'heart' of the zoned buddy allocator."。
 
 在[Node->Zone->Page][2]中我们已经看到了，内存被分为了node，zone来管理。这么管理的目的也就是为了在分配的时候，能能够找到合适的内存。所以在分配的时候，就是按照优先级搜索node和zone，如果找到匹配的zone则在该zone的free_area链表中取下一个。
 
