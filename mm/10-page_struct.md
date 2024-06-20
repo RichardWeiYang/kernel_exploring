@@ -188,6 +188,23 @@ FLAGS是一个按照比特位来定义的属性集合，比如我们可以看一
 
     * PageXXX()
     * SetPageXXX()
-    * ClearPage()
+    * ClearPageXXX()
 
 这三个宏分别用来判断、设置、清楚页结构体中相应的属性。在内核代码中使用非常广泛，以后看到长成这样的，就可以到这个头文件中搜索。
+
+## 定义FLAGS操作
+
+虽然我们上面看到了，在代码中用的是SetPageXXX()/ClearPageXXX()来操作flags，但是因为这一套基本是同样的操作，所以代码中并没有给每个bit定义单独的Set/Clear。
+
+而是通过两个宏来定义的
+
+* PAGEFLAG   原子操作
+* __PAGEFLAG 非原子操作
+
+所以在page-flags.h文件中可以看到一串用PAGEFLAG()定义的内容。如
+
+```c
+PAGEFLAG(Dirty, dirty, PF_HEAD)
+PAGEFLAG(LRU, lru, PF_HEAD)
+PAGEFLAG(Active, active, PF_HEAD)
+```
