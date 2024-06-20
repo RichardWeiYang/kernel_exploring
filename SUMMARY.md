@@ -37,6 +37,7 @@
       * [眼花的页结构体](mm/10-page_struct.md)
       * [Node-Zone-Page](mm/05-Node_Zone_Page.md)
       * [传说的伙伴系统](mm/06-page_alloc.md)
+      * [Compound Page](mm/page_allocator/01-compound_page.md)
       * [GFP的功效](mm/12-gfp_usage.md)
       * [页分配器的用户们](mm/11-users_of_buddy.md)
     * [slub分配器](mm/slub_allocator/00_slub.md)
