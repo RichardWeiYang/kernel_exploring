@@ -351,9 +351,15 @@ Node Fallback list
 
 内核中有很多释放内存的地方，这里我们总结一下。
 
+* __free_pages_core，这是将内存从memblock/hotplug时，加入到buddy system
 * 核心 __free_one_page，最后都要通过这个函数将内存放到free_list上
-* __free_page_core，这是将内存从memblock/hotplug时，加入到buddy system
-* free_one_page 及其延伸接口 free_unref_page/free_unref_folio
+* free_one_page 这个和__free_one_page的差别就是拿了zone的锁，大部分实际会走这里
+* __free_pages_ok/free_unref_page/free_unref_folio, 在free_one_page前调用free_pages_prepare()
+* __free_pages/put_page/folio_put, 先减去引用计数，再调用free_unref_[page|folio]
+
+### __free_pages_core
+
+这是个比较特殊的接口，从memblock/hotplug来的内存通过这个接口释放到buddy system。
 
 ### __free_one_page流程
 
@@ -382,13 +388,18 @@ done_merging:
     add_to_free_list[_tail](page, zone, order, migratetype)       // 添加到free_list上
 ```
 
-### __free_page_core
+### free_one_page
 
-这是个比较特殊的接口，从memblock/hotplug来的内存通过这个接口释放到buddy system。
+这个和__free_one_page的差别在与持锁操作
 
-### free_one_page(free_unref_[page|foio])
+### __free_pages_ok/free_unref_[page|foio]
 
-这个和__free_one_page的差别在与可能会释放到per_cpu_pageset。
+在free_one_page前，调用了free_pages_prepare()
+
+### __free_pages/put_page
+
+这两个都是先减去引用计数，再调用free_unref_page。
+这两者有细微的差别，具体可以看__free_pages的注释。
 
 # 分配
 
