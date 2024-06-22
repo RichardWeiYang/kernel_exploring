@@ -32,6 +32,8 @@
 
 水线的计算在函数setup_per_zone_wmarks()中完成。不仅启动时会计算，还会在某些参数调整时再次计算。
 
+启动时计算流程参见[初始化流程][1]
+
 整个计算过程其实不难，让我用伪代码解释一下：
 
 ```
@@ -158,3 +160,5 @@ setup_per_zone_lowmem_reserve()是设置lowmem_reserve[]的函数，让我们用
 * lr[i]: lowmem_reserve[i]
 
 这么看来 zone.lowmem_reserve[i]的含义是**如果要在zone上分配 zone[i]的内存，而此时zone上的内存小于zone.lowmem_reserve[i] + watermark，那么这个分配将出发回收动作。**.
+
+[1]: /mm/02-memblock.md

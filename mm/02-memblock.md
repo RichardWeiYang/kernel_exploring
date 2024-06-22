@@ -110,6 +110,9 @@ start_kernel()
             kernel_init_freeable()
                 page_alloc_init_late()
                     memblock_discard()               // discard region array
+                do_basic_setup()
+                    init_per_zone_wmark_min()
+                        setup_per_zone_wmarks()      // 初始化wmark
             free_initmem()
                 free_kernel_image_pages()            // 释放__init标记的，在__init_begin/end之间的内存
 ```
