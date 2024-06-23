@@ -66,6 +66,18 @@ PS: 这里的watermark_scale_factor也可以从/proc/sys/vm/watermark_scale_fact
 
 好了，是不是挺简单的了。
 
+## min_free_kbytes
+
+在水线计算过程中，我们可以看到依赖了一个值pages_min。而这个值是从min_free_kbytes转换来的。
+
+min_free_kbytes是在calculate_min_free_kbytes()中计算得到。实际公式很简单，在注释中已经给出了。
+
+```
+ 	min_free_kbytes = sqrt(lowmem_kbytes * 16)
+```
+
+而这个lowmem_kbytes实际是从nr_free_buffer_pages()得到的，可以认为就是所有buddy管理的内存。
+
 ## 水位查看
 
 了解了计算过程，我们也可以来看看当前系统中真实设置的值。这个信息可以在/proc/zoneinfo中查到。
