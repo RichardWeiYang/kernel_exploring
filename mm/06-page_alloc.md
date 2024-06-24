@@ -407,7 +407,14 @@ done_merging:
 
 在[Node->Zone->Page][2]中我们已经看到了，内存被分为了node，zone来管理。这么管理的目的也就是为了在分配的时候，能能够找到合适的内存。所以在分配的时候，就是按照优先级搜索node和zone，如果找到匹配的zone则在该zone的free_area链表中取下一个。
 
-和释放内存对称，分配的时候也可能会分配到高阶的page。如果发生这种情况，则会将高阶部分放回到对应的free_area中。
+这里面涉及到两个问题：
+
+* 按照什么顺序从zone上分配内存
+* 怎么判断应该要去下一个zone上去找
+
+第一个问题我们前面看到过了，就是zonelist。而第二个问题是由[水线][5]来判断的。这涉及到了内存回收，已经是另一个课题了。
+
+和释放内存对称，分配的时候也可能会分配到高阶的page。如果发生这种情况，则会将高阶部分内存拆分到低阶的page，再放回到对应的free_area中。这部分代码可以看__rmqueue_smallest()。
 
 # 引用计数
 
@@ -471,3 +478,4 @@ check_new_page()
 [2]: /mm/05-Node_Zone_Page.md
 [3]: /virtual_mm/02-thp_mapcount.md
 [4]: /mm/54-defer_init.md
+[5]: /mm_reclaim/02-watermark.md
