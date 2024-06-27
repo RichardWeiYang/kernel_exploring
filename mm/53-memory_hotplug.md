@@ -96,3 +96,62 @@ hot-online就是要把内存放到buddy system，让内核管理起这部分内�
 * (3) 重新构造所有NODE_DATA上的zonelist
 
 这么看好像也不是很难。当然魔鬼在细节，仔细看还是有不少内容的。
+
+# 利用qemu测试内存热插
+
+这功能还好有虚拟机，否则真是不好测试。
+
+## 内核配置
+
+有几个内存配置需要加上
+
+```
+ACPI_HOTPLUG_MEMORY
+MEMORY_HOTPLUG
+ARCH_ENABLE_MEMORY_HOTPLUG
+MEMORY_HOTPLUG_DEFAULT_ONLINE
+```
+
+## 启动虚拟机
+
+启动虚拟机时，有几个参数需要注意。
+
+这里给出一个可以用的
+
+```
+qemu-system-x86_64 -m 6G,slots=32,maxmem=32G -smp 8 --enable-kvm  -nographic \
+	-drive file=fedora.img,format=raw -drive file=project.img,format=qcow2 \ 
+	-object memory-backend-ram,id=mem1,size=3G -object memory-backend-ram,id=mem2,size=3G \
+        -numa node,nodeid=0,memdev=mem1 -numa node,nodeid=1,memdev=mem2
+```
+
+初始内存是6G，最多可以扩展到32G。配置了两个node，每个node上3G内存。
+
+可以通过numactl -H和free -h来确认当前内存。
+
+## 热插内存
+
+启动完后，需要使用qemu monitor来插入内存。
+
+通过Ctrl + a + c，调出qemu monitor。
+
+
+```
+object_add memory-backend-ram,id=ram0,size=1G
+device_add pc-dimm,id=dimm0,memdev=ram0,node=1
+```
+
+增加1G内存到node1。
+
+因为我们选择了 MEMORY_HOTPLUG_DEFAULT_ONLINE，所以新插的内存直接添加到了系统，可以用free -h查看到。
+
+## 手动上线内存
+
+前面我们也看到热插的时候有hot-add和hot-online两个步骤。如果没有选择MEMORY_HOTPLUG_DEFAULT_ONLINE，在执行完qemu的命令后需要手动上线内存。
+
+```
+cd /sys/devices/system/memory/memory56
+sudo echo 1 > online
+```
+
+事先看好哪个memory设备是新增的，然后进入对应设备的目录执行。
