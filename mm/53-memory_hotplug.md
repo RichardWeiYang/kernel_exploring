@@ -151,7 +151,11 @@ device_add pc-dimm,id=dimm0,memdev=ram0,node=1
 
 ```
 cd /sys/devices/system/memory/memory56
-sudo echo 1 > online
+sudo echo online_movable > state
 ```
 
 事先看好哪个memory设备是新增的，然后进入对应设备的目录执行。
+
+还有一些细节在[内核文档][1]里有详细描述。
+
+[1]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/admin-guide/mm/memory-hotplug.rst
