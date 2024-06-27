@@ -36,7 +36,7 @@ add_memory_resource()
 
 而且这么划分有实际意义。在某些情况下，nvdimm，可以只通过hot-add将内存告知系统，但不添加到buddy system。
 
-# hot-add
+## hot-add
 
 hot-add的意义在于给对应的内存分配page struct，也就是有了内存管理的元数据。这样就可以管理内存了。
 
@@ -63,7 +63,7 @@ hot-add的意义在于给对应的内存分配page struct，也就是有了内�
 
 有一点值得注意的是在(1)处，这里是保证是subsection对齐的。也就是对于不用hot-online的内存可以是subsection。
 
-# hot-online
+## hot-online
 
 hot-online就是要把内存放到buddy system，让内核管理起这部分内存。
 
