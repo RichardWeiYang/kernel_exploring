@@ -53,7 +53,7 @@ Maple Tree中的一个节点用maple_node表示，理解了其中时如何表达
 
 # 函数详解
 
-# mas_wr_walk()
+## mas_wr_walk()
 
 这个函数是用来在写入数据前查找对应节点的，这个的作用和红黑树和B树在插入前做的动作一样。所以遍历过程就不再赘述，而是讲一下遍历中保存的几个在最后修改值过程中要用到的值。
 
@@ -90,7 +90,7 @@ Maple Tree中的一个节点用maple_node表示，理解了其中时如何表达
 
 PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()搭配使用才有效果。
 
-# mas_wr_node_store()
+## mas_wr_node_store()
 
 遍历完找到需要修改的叶子节点，我们最终的目的是将[index, last]写入到节点中。这个过程有好几种case，我们打开看一下。
 
@@ -99,7 +99,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
 
 因为有新增插入slot的情况，此时新增一个变量new_end以表示完成插入后节点预期长度。
 
-## offset == offset_end
+### offset == offset_end
 
 这时，说明[index, last]这个区域就在offset下标所指定的区域内，并不影响到其他区域。
 并且, end_piv实际上等于r_max。
@@ -116,7 +116,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
                    offset
 ```
 
-### index == r_min && last == r_max
+#### index == r_min && last == r_max
 
 这种情况说明只要直接改写原有slot的值，并没有改变区域划分。比较直接。
 
@@ -133,7 +133,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
 
 此时节点长度并没有变化。
 
-### index != r_min && last != r_max
+#### index != r_min && last != r_max
 
 这种情况需要在原区域的前后都要切一块出来。
 
@@ -149,7 +149,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
 
 所以这种情况下，需要增加两个slot来标记。
 
-### index == r_min && last != r_max
+#### index == r_min && last != r_max
 
 ```
     +------+......+------+......+------+......+------+
@@ -161,7 +161,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
  new_end = end + 1
 ```
 
-### index != r_min && last == r_max
+#### index != r_min && last == r_max
 
 ```
     +------+......+------+......+------+......+------+
@@ -173,7 +173,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
  new_end = end + 1
 ```
 
-## offset < offset_end
+### offset < offset_end
 
 这时，说明[index, last]在原节点上跨了多个区域。并且在小case的比较上，不是对比r_max了，而是end_piv。
 
@@ -189,7 +189,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
                    offset               offset_end
 ```
 
-### index == r_min && last == end_piv
+#### index == r_min && last == end_piv
 
 ```
     +------+......+------+......+------+
@@ -201,7 +201,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
  new_end = end - (offset_end - offset)
 ```
 
-### index != r_min && last != end_piv
+#### index != r_min && last != end_piv
 
 ```
     +------+......+------+......+------+......+------+......+------+
@@ -213,7 +213,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
  new_end = end + 2 - (offset_end - offset)
 ```
 
-### index == r_min && last != end_piv
+#### index == r_min && last != end_piv
 
 ```
     +------+......+------+......+------+......+------+
@@ -225,7 +225,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
  new_end = end + 1 - (offset_end - offset)
 ```
 
-### index != r_min && last == end_piv
+#### index != r_min && last == end_piv
 
 ```
     +------+......+------+......+------+......+------+
@@ -237,7 +237,7 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
  new_end = end + 1 - (offset_end - offset)
 ```
 
-# mas_wr_modify()
+## mas_wr_modify()
 
 mas_wr_modify()是mas_wr_node_store()的父函数，虽然在mas_wr_node_store()中可以处理（几乎）所有的情况，但是在mas_wr_modify()里还是做了点优化。
 
@@ -245,13 +245,13 @@ mas_wr_modify()是mas_wr_node_store()的父函数，虽然在mas_wr_node_store()
 
 在了解了各种修改的情况后，我们再来看看这些可以优化的case。
 
-## offset == end: mas_wr_append()
+### offset == end: mas_wr_append()
 
 变化的区间正好是当前节点最后一个区域的情况。而且隐含的条件是offset == offset_end，因为offset_end不可能大于end。
 
 因为只需要添加到节点最后，所以单独拿出来做了一个优化。不过对rcu情况不适用。
 
-## new_end == end: mas_wr_slot_store()
+### new_end == end: mas_wr_slot_store()
 
 这中情况说明节点内的数据长度并没有变化，所以我们不需要复制一个新的节点来做变更，只要在本地做修改就性了。
 
