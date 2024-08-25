@@ -237,6 +237,26 @@ PS: 补充一点， end_piv是在mas_wr_end_piv()中计算的，和mas_wr_walk()
  new_end = end + 1 - (offset_end - offset)
 ```
 
+# mas_wr_modify()
+
+mas_wr_modify()是mas_wr_node_store()的父函数，虽然在mas_wr_node_store()中可以处理（几乎）所有的情况，但是在mas_wr_modify()里还是做了点优化。
+
+原因是mas_wr_node_store()的操作都是基于复制节点来实现的。而在某些情况下，并不需要复制节点，而只要在原节点上进行修改依然可以做到rcu safe。
+
+在了解了各种修改的情况后，我们再来看看这些可以优化的case。
+
+## offset == end: mas_wr_append()
+
+变化的区间正好是当前节点最后一个区域的情况。而且隐含的条件是offset == offset_end，因为offset_end不可能大于end。
+
+因为只需要添加到节点最后，所以单独拿出来做了一个优化。不过对rcu情况不适用。
+
+## new_end == end: mas_wr_slot_store()
+
+这中情况说明节点内的数据长度并没有变化，所以我们不需要复制一个新的节点来做变更，只要在本地做修改就性了。
+
+而且这里有个隐含条件是offset < offset_end，因为在offset == offset_end的case中，没有长度不变的情况。PS:唯一不便的情况已经被特殊处理了。
+
 # 参考资料
 
 * [内核文档][1]
