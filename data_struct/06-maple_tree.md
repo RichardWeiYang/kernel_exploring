@@ -245,6 +245,8 @@ mas_wr_modify()是mas_wr_node_store()的父函数，虽然在mas_wr_node_store()
 
 在了解了各种修改的情况后，我们再来看看这些可以优化的case。
 
+**PS: 强调一点，进入mas_wr_modify时，mas->node一定是叶子节点。所以不用拷贝gap。**
+
 ### offset == end: mas_wr_append()
 
 变化的区间正好是当前节点最后一个区域的情况。而且隐含的条件是offset == offset_end，因为offset_end不可能大于end。
