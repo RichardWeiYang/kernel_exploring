@@ -259,6 +259,26 @@ mas_wr_modify()是mas_wr_node_store()的父函数，虽然在mas_wr_node_store()
 
 而且这里有个隐含条件是offset < offset_end，因为在offset == offset_end的case中，没有长度不变的情况。PS:唯一不便的情况已经被特殊处理了。
 
+# 测试代码
+
+在内核代码里有专门的测试程序，在这里记录一下。一旦有改动，需要通过测试程序才能提交。
+
+```
+# cd tools/testing/radix-tree/
+# make maple
+# ./maple
+```
+
+还有对应的内核模块测试代码。
+
+```
+# ls lib/test_maple_tree.c
+```
+
+不过需要打开选项CONFIG_TEST_MAPLE_TREE。
+
+编译完，安装内核模块也是测试。不过比用户态的程序少了点case。
+
 # 参考资料
 
 * [内核文档][1]
