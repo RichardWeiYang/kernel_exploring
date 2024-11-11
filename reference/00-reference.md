@@ -23,9 +23,12 @@ awk -F "-" '{print $1}' kernel_index | uniq > kernel_index.first
 
 这样可以筛出来一级标题，虽然也挺多的。。。
 
+忘了还有一个重量级的宝库[内核自带文档][7]。
+
 [1]: https://lwn.net/Kernel/Index/
 [2]: https://lwn.net/Kernel/Index/#Development_model-Patterns
 [3]: https://lwn.net/Kernel/Index/#Development_tools-Git
 [4]: https://lwn.net/Kernel/Index/#Development_tools-Kernel_debugging
 [5]: /reference/01-mm.md
 [6]: https://lwn.net/Kernel/Index/#Kernel_Hackers_Bookshelf
+[7]: /reference/03-kernel_doc.md
