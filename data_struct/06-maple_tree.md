@@ -259,6 +259,43 @@ mas_wr_modify()是mas_wr_node_store()的父函数，虽然在mas_wr_node_store()
 
 而且这里有个隐含条件是offset < offset_end，因为在offset == offset_end的case中，没有长度不变的情况。PS:唯一不便的情况已经被特殊处理了。
 
+# 常用API
+
+maple tree提供了一些API，然后其他子系统，比如mm，会在这个基础上再封装一层。
+
+## mas_prev|next()
+
+这一类一共有四个函数
+
+* mas_prev(mas, min)
+* mas_next(mas, max)
+* mas_prev_range(mas, min)
+* mas_next_range(mas, max)
+
+他们两两行为是对称的，一个是往前，一个是往后。
+
+> 在叶子节点一层，在mas->index位置上往前|后一格。
+
+区别在与
+
+* mas_prev|next(): 是要一直找到前|后面一格非空的slot。
+* mas_prev|next_range(): 则只是往前|后一格，如果是空也没有关系。
+
+
+除此之外，还要关注mas中index/last的变化。
+
+* 遍历时是按照mas->index的值去找的，和mas->last没有关系。查找的最大范围是通过参数max来指定的。
+* 不论找不找得到，mas->index/last都会设置到某个真实的range的范围上
+* 如果不能再往前或者往后了，status会被设置成ma_overflow或者ma_underflow
+* 最后mas->index/last指定的范围一定和min/max指定的范围有交叉
+
+## mas_find()
+
+这个函数的行为和mas_next()非常相似，除了在第一次执行的时候。
+
+如果第一次执行时，mas->index对应有值则返回这个值。而mas_next()则需要时返回下一个。
+如果第一次执行时，mas->index对应值为NULL，返回结果和mas_next()一样。
+
 # 测试代码
 
 在内核代码里有专门的测试程序，在这里记录一下。一旦有改动，需要通过测试程序才能提交。
