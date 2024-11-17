@@ -59,6 +59,7 @@
     * [透明大页的玄机](virtual_mm/04-thp.md)
     * [NUMA策略](virtual_mm/07-mempolicy.md)
     * [numa balance](virtual_mm/08-numa_balance.md)
+    * [老版vma](virtual_mm/deprecate-vma.md)
   * [内存的回收再利用](mm_reclaim/00-index.md)
     * [水线](mm_reclaim/02-watermark.md)
     * [Big Picture](mm_reclaim/03-big_picture.md)

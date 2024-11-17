@@ -28,6 +28,8 @@
 
 [虚拟地址空间的管家--vma][6]
 
+PS: 在引入maple tree之前的[版本][10]
+
 # 反向映射
 
 反向映射是用来搜索对于某一个内存页，都有哪些进程在使用。其中分成了匿名页和文件页。
@@ -63,3 +65,4 @@
 [7]: /virtual_mm/06-anon_rmap_usage.md
 [8]: /virtual_mm/07-mempolicy.md
 [9]: /virtual_mm/08-numa_balance.md
+[10]: /virtual_mm/deprecate-vma.md
