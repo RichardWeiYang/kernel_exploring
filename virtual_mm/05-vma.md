@@ -141,6 +141,8 @@ Documentation/mm/process_addrs.rst
 
 为了方便看也可以生成html文档，用浏览器阅读。具体方法可以看[内核自带文档][1]，如何生成文档。
 
+PS: 另外LWN也有关于[Per-VMA lock][2]的解释。
+
 ## 图解
 
 这里我再用自己的理解解释一遍：
@@ -258,3 +260,4 @@ mmap设置了对应的vm_ops后，page fault发生时就会找到这个vma，并
 以后有改动就要先通过这个测试了。另外有什么不清楚的，也可以在用户态程序里先跑跑看。
 
 [1]: /reference/03-kernel_doc.md
+[2]: https://lwn.net/Articles/906852/
