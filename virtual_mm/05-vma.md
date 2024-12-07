@@ -133,6 +133,16 @@ vma_find()一般作为迭代器刚开始第一次调用，作用是查找[vmi.in
 进程地址空间的访问（缺页中断）和改变（mmap/mprotect）是系统核心的操作，而缺页中断则是非常频繁的。
 为了优化这部分的性能，同时又避免地址空间损坏，内核中提供了非常精巧的锁机制。
 
+目前内核引入了Per-VMA lock，具体的commit为
+
+```
+commit 0b6cc04f3db3604c1485049bc9582523c2b44b75
+Author: Suren Baghdasaryan <surenb@google.com>
+Date:   Mon Feb 27 09:36:08 2023 -0800
+
+    mm: introduce CONFIG_PER_VMA_LOCK
+```
+
 ## 内核文档
 
 首先内核中有一个文档详细讲解这部分的内容。
