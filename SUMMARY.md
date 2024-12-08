@@ -120,6 +120,8 @@
   * [xarray](data_struct/04-xarray.md)
   * [B树](data_struct/05-btree.md)
   * [Maple Tree](data_struct/06-maple_tree.md)
+* [同步机制](synchronization/00-index.md)
+  * [RCU](synchronization/01-rcu.md)
 * [Good To Read](reference/00-reference.md)
   * [内核自带文档](reference/03-kernel_doc.md)
   * [内存相关](reference/01-mm.md)
