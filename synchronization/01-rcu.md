@@ -36,6 +36,20 @@
 
 ## Wait For Pre-Existing RCU Readers to Complete
 
+本质上，RCU是一种等的功夫。但是厉害的是，**RCU并不记录具体跟踪的对象**。
+
+> The great advantage of RCU is that it can wait for each of (say) 20,000 different things without having to explicitly track each and every one of them, and without having to worry about the performance degradation, scalability limitations, complex deadlock scenarios, and memory-leak hazards that are inherent in schemes using explicit tracking.
+
+用rcu_read_lock()/rcu_read_unlock()原语界定的区域是RCU read-side critical section。这段区域可以包含任何代码，**除了 阻塞和睡眠(block or sleep)**。
+
+文档[2]中描述了等待机制synchronize_rcu()的原理，就是让自己在所有cpu上都调度一遍。原因是：
+
+> RCU Classic read-side critical sections delimited by rcu_read_lock() and rcu_read_unlock() are not permitted to block or sleep. Therefore, when a given CPU executes a context switch, we are guaranteed that any prior RCU read-side critical sections will have completed. 
+
+这里的前提是RCU critical section中间的代码不能阻塞和睡眠，一旦调度发生，表明RCU read-side critical section一定执行完了。
+
+所以当synchronize_rcu()返回，就可以清理相应的数据了。
+
 ## Maintain Multiple Versions of Recent Updated Objects
 
 # 参考资料
