@@ -54,9 +54,70 @@
 
 我觉得实际上就是通过上面的延迟销毁来做到的。
 
+# 一个例子
+
+在参考[3]中，有这么一个使用rcu的例子。
+
+```
+ 1 struct el {
+ 2   struct list_head list;
+ 3   long key;
+ 4   spinlock_t mutex;
+ 5   int data;
+ 6   /* Other data fields */
+ 7 };
+ 8 spinlock_t listmutex;
+ 9 struct el head;
+
+ 1 int search(long key, int *result)
+ 2 {
+ 3   struct list_head *lp;
+ 4   struct el *p;
+ 5
+ 6   rcu_read_lock();
+ 7   list_for_each_entry_rcu(p, head, lp) {
+ 8     if (p->key == key) {
+ 9       *result = p->data;
+10       rcu_read_unlock();
+11       return 1;
+12     }
+13   }
+14   rcu_read_unlock();
+15   return 0;
+16 }
+
+ 1 int delete(long key)
+ 2 {
+ 3   struct el *p;
+ 4
+ 5   spin_lock(&listmutex);
+ 6   list_for_each_entry(p, head, lp) {
+ 7     if (p->key == key) {
+ 8       list_del_rcu(&p->list);
+ 9       spin_unlock(&listmutex);
+10       synchronize_rcu();
+11       kfree(p);
+12       return 1;
+13     }
+14   }
+15   spin_unlock(&listmutex);
+16   return 0;
+17 }
+```
+
+其中在delete函数中有一个我开始不太理解的用法。
+
+> 为什么这里遍历的时，用的是list_for_each_entry()，而不是list_for_each_entry_rcu()
+
+我现在的理解是，因为update操作用spin_lock保证了此时没有别人变更链表，且锁本身保证了内存一致性。
+所以现在用list_for_each_entry()看到的就是最新的版本，不会有老的版本。
+
+但是此时删除为什么要用list_del_rcu()？后续的spin_unlock()难道不能保证内存被正确同步吗?
+
 # 参考资料
 
 [内核文档--RCU概念][1]
 
 [1]: https://docs.kernel.org/RCU/index.html
 [2]: https://lwn.net/Articles/262464/
+[3]: https://lwn.net/Articles/263130/
