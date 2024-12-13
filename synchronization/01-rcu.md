@@ -118,6 +118,9 @@
 
 [内核文档--RCU概念][1]
 
+[Memory Barriers][4]
+
 [1]: https://docs.kernel.org/RCU/index.html
 [2]: https://lwn.net/Articles/262464/
 [3]: https://lwn.net/Articles/263130/
+[4]: https://docs.kernel.org/core-api/wrappers/memory-barriers.html
