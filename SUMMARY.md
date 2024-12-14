@@ -121,6 +121,7 @@
   * [B树](data_struct/05-btree.md)
   * [Maple Tree](data_struct/06-maple_tree.md)
 * [同步机制](synchronization/00-index.md)
+  * [内存屏障](synchronization/02-memory_barrier.md)
   * [RCU](synchronization/01-rcu.md)
 * [Good To Read](reference/00-reference.md)
   * [内核自带文档](reference/03-kernel_doc.md)
