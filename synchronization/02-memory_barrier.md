@@ -13,6 +13,8 @@ PS: 在[1]的GUARANTEES部分，提到了编译器和CPU会保证顺序的情况
 
 而内存屏障提供了一种方法，让代码的执行顺序能按照我们写的来。
 
+PS: 实际上应该是内存屏障和编译屏障一起提供保障。
+
 # 内存屏障的种类
 
 通常我们看到的种类有：
@@ -31,6 +33,40 @@ PS: 在[1]的GUARANTEES部分，提到了编译器和CPU会保证顺序的情况
   * RELEASE operation
 
 这两个有点特别，不是很懂。
+
+# Address Dependency Barrier(Historical)
+
+我们先看一个例子：
+
+```
+        CPU 1                 CPU 2
+        ===============       ===============
+        { A == 1, B == 2, C == 3, P == &A, Q == &C }
+        B = 4;
+        <write barrier>
+        WRITE_ONCE(P, &B);
+                              Q = READ_ONCE_OLD(P);
+                              D = *Q;
+```
+
+这里面有个很神奇的情况，就是从CPU2的角度看P已经赋值为&B，但是B还是2。（这种情况会发生在split cache的机器上）
+
+具体解决方法是使用READ_ONCE()，因为当前的READ_ONCE()里隐藏了address dependency。
+
+```
+        CPU 1                 CPU 2
+        ===============       ===============
+        { A == 1, B == 2, C == 3, P == &A, Q == &C }
+        B = 4;
+        <write barrier>
+        WRITE_ONCE(P, &B);
+                              Q = READ_ONCE(P);
+                              <implicit address-dependency barrier>
+                              D = *Q;
+```
+
+这里需要关注的是，如果没有隐藏的address
+dependency，会影响rcu的功能。我们可以把P看作一个全局指针，B是一个新的版本。当CPU2认为P已经更新到B这个版本时，如果看到的B里内容不是最新的，那就有问题了。
 
 # Control Dependency
 
