@@ -7,7 +7,9 @@
   * 编译器优化代码
   * CPU乱序执行
   * 内存一致性
+  * 内存合并操作
   * 内存预读取
+  * 分支预测
 
 PS: 在[1]的GUARANTEES部分，提到了编译器和CPU会保证顺序的情况--访问的变量有前后依赖的情况。
 
@@ -32,7 +34,9 @@ PS: 实际上应该是内存屏障和编译屏障一起提供保障。
   * ACQUIRE operation
   * RELEASE operation
 
-这两个有点特别，不是很懂。
+这两个我感觉以RCU里面的subscribe/publish来理解可能容易点。
+
+RELEASE对应的是publish，而ACQUIRE对应的是subscribe。之前我一直认为RELEASE是释放的意思，但感觉这里解释为发布更为合适。
 
 # Address Dependency Barrier(Historical)
 
@@ -65,8 +69,8 @@ PS: 实际上应该是内存屏障和编译屏障一起提供保障。
                               D = *Q;
 ```
 
-这里需要关注的是，如果没有隐藏的address
-dependency，会影响rcu的功能。我们可以把P看作一个全局指针，B是一个新的版本。当CPU2认为P已经更新到B这个版本时，如果看到的B里内容不是最新的，那就有问题了。
+这里需要关注的是，如果没有隐藏的address dependency，会影响rcu的功能。
+我们可以把P看作一个全局指针，B是一个新的版本。当CPU2认为P已经更新到B这个版本时，如果看到的B里内容不是最新的，那就有问题了。
 
 # Control Dependency
 
@@ -193,6 +197,13 @@ CPU1/CPU2中各自要加上屏障，才能保证CPU2上读到B==2后，A等于1�
 
 这样如果有另一个线程在do_something_with()前更改了a，那就不是我们想要的行为了。
 
+所以这种情况需要写成：
+
+```
+        while (tmp = READ_ONCE(a))
+                do_something_with(tmp);
+```
+
 ## CPU memory barrier
 
 内核中其中基本的内存屏障：
@@ -223,8 +234,15 @@ CPU1/CPU2中各自要加上屏障，才能保证CPU2上读到B==2后，A等于1�
   * accessing device
   * interrupt
 
+# 内存模型模拟
+
+在[1]中，提到了一个内存模型的模拟器herd7，以及内核中相关验证代码在tools/memory-model目录。
+
+另外还找到[一篇文章][2]简述了herd7的使用。
+
 # 参考资料
 
 [Memory Barriers][1]
 
 [1]: https://docs.kernel.org/core-api/wrappers/memory-barriers.html
+[2]: https://www.joelfernandes.org/resources/lkmm_herd7.pdf
