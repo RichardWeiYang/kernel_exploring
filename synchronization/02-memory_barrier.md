@@ -240,6 +240,36 @@ CPU1/CPU2中各自要加上屏障，才能保证CPU2上读到B==2后，A等于1�
 
 另外还找到[一篇文章][2]简述了herd7的使用。
 
+# 一些例子
+
+## Double-checked locking
+
+内核文档 Documentation/litmus-tests/locking/DCL-broken.litmus 写了一个很有意思的问题。
+
+对应还有解释在tools/memory-model/Documentation/locking.txt。
+
+下面这段代码是有问题的
+
+```
+	void CPU0(void)
+	{
+		r0 = READ_ONCE(flag);                 --------+
+		if (r0 == 0) {                                |
+			spin_lock(&lck);                      |
+			r1 = READ_ONCE(flag);                 |
+			if (r1 == 0) {                        |
+				WRITE_ONCE(data, 1);  --+     |
+				WRITE_ONCE(flag, 1);  --+     |
+			}                                     |
+			spin_unlock(&lck);                    |
+		}                                             |
+		r2 = READ_ONCE(data);                 --------+
+	}
+	/* CPU1() is the exactly the same as CPU0(). */
+```
+
+因为在上面标出来的两对代码可能会被重排，所以需要用smp_load_acquire()/smp_store_release()修复。
+
 # 参考资料
 
 [Memory Barriers][1]
