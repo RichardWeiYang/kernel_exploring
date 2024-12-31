@@ -113,11 +113,25 @@
 所以现在用list_for_each_entry()看到的就是最新的版本，不会有老的版本。
 
 但是此时删除为什么要用list_del_rcu()？后续的spin_unlock()难道不能保证内存被正确同步吗?
+答：是我从函数名字上去理解了。list_del_rcu()的定义是：
+
+```
+static inline void list_del_rcu(struct list_head *entry)
+{
+	__list_del_entry(entry);
+	entry->prev = LIST_POISON2;
+}
+```
+
+也就是执行完后保留了entry->next，是为了list_for_each_entry()能够继续往后面去找。
+而普通的list，在删除的时候是通过list_for_each_entry_safe()事先得到next。所以list_del()的时候能够直接清除next。
 
 # 参考资料
 
 [内核文档--RCU概念][1]
+[RCU dereference][2]
 
 [1]: https://docs.kernel.org/RCU/index.html
 [2]: https://lwn.net/Articles/262464/
 [3]: https://lwn.net/Articles/263130/
+[4]: https://docs.kernel.org/RCU/rcu_dereference.html
