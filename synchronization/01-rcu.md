@@ -105,12 +105,16 @@
 17 }
 ```
 
+## 为什么用list_for_each_entry()?
+
 其中在delete函数中有一个我开始不太理解的用法。
 
 > 为什么这里遍历的时，用的是list_for_each_entry()，而不是list_for_each_entry_rcu()
 
 我现在的理解是，因为update操作用spin_lock保证了此时没有别人变更链表，且锁本身保证了内存一致性。
 所以现在用list_for_each_entry()看到的就是最新的版本，不会有老的版本。
+
+## 为什么用list_del_rcu()?
 
 但是此时删除为什么要用list_del_rcu()？后续的spin_unlock()难道不能保证内存被正确同步吗?
 答：是我从函数名字上去理解了。list_del_rcu()的定义是：
@@ -126,6 +130,14 @@ static inline void list_del_rcu(struct list_head *entry)
 也就是执行完后保留了entry->next，是为了list_for_each_entry()能够继续往后面去找。
 而普通的list，在删除的时候是通过list_for_each_entry_safe()事先得到next。所以list_del()的时候能够直接清除next。
 
+## 不能list_move()?
+
+在[protect list and objects][5] 中，说到不能用 hlist_for_each_entry_rcu()。而是要中间加一个smp_rmb()。
+
+否则该节点已经从原链表移动到了新的链表，这样->next就被该改变，而无法继续遍历原来的链表。
+
+从这点我想到，如果对一个链表执行list_move()应该也是不行的。
+
 # 参考资料
 
 [内核文档--RCU概念][1]
@@ -135,3 +147,4 @@ static inline void list_del_rcu(struct list_head *entry)
 [2]: https://lwn.net/Articles/262464/
 [3]: https://lwn.net/Articles/263130/
 [4]: https://docs.kernel.org/RCU/rcu_dereference.html
+[5]: https://docs.kernel.org/RCU/rculist_nulls.html
