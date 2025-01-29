@@ -257,6 +257,12 @@ mmap设置了对应的vm_ops后，page fault发生时就会找到这个vma，并
 
 好了，到这里就到这里。
 
+# 进程地址空间布局
+
+虽然我们可以通过mmap分配地址空间给进程，但是也不是我们随意想分哪里就分哪里的。
+
+比如x86架构下，具体空间如何使用可以看[mm layout][5]
+
 # 功能测试
 
 最近内核中添加了用户态的测试程序，在这里看下怎么跑的。
@@ -370,3 +376,4 @@ PS：要在当前目录上打开，因为依赖plot.js这个文件。
 [2]: https://lwn.net/Articles/906852/
 [3]: https://lwn.net/Articles/937943
 [4]: https://github.com/antonblanchard/will-it-scale
+[5]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/arch/x86/x86_64/mm.rst
