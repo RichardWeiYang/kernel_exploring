@@ -1,6 +1,6 @@
 虚拟内存空间的物理根本可以说就是页表了，没有页表虚拟地址空间是无法幻化出让人眼花缭乱的变化。
 
-# 页表的样子
+# 页表的层次
 
 当然，页表本身已经够让人眼花缭乱了。那就先让我们来看一下页表的样子先。
 
@@ -45,7 +45,53 @@ pgd_offset(mm,addr)+---->| *pgd     |-------->+----------+
 
 ```
 
-看完了，其实也就是那样。原来觉得很难很神秘的东西，现在看来好像也就那样。
+其中最上面一行中出现的名词，如PML4，是在intel手册上的。而下方的xx_index/xx_offset是在内核代码中对应使用的名字。
+
+当然上面这个图例已经有点过时了，这个是四层页表的情况，现在已经有五层也表了。
+
+比如在[page table][1]中可以看到五层是这样的。
+
+```
+  +-----+
+  | PGD |
+  +-----+
+     |
+     |   +-----+
+     +-->| P4D |
+         +-----+
+            |
+            |   +-----+
+            +-->| PUD |
+                +-----+
+                   |
+                   |   +-----+
+                   +-->| PMD |
+                       +-----+
+                          |
+                          |   +-----+
+                          +-->| PTE |
+                              +-----+
+```
+
+## 页表层级常用helper
+
+首先我们从上面图中看到内核中对页表每一层都起了自己的名字：
+
+  * pgd
+  * p4d
+  * pud
+  * pmd
+  * pte
+
+在操作对应层级时，也有对应的helper帮助我们获取对应的信息：
+
+  * xxx_index():    获取对应层级偏移量，用来计算下级页表地址
+  * xxx_offset():   在xxx_index()的基础上，取出下一级的页表entry内容
+  * xxx_alloc():    如果已经有页表，返回结果同xxx_offset()；否则分配xxx对应层级的页表
+  * xxx_none():     xxx对应这个entry是否为空，空说明需要分配下级页表了
+  * xxx_present():  xxx对应这个entry是否存在，其实是看下一层页表是否存在
+  * xxx_populate(): 安装页表，把下一层新分配的页表地址填到xxx表示的这一层
+  * xxx_install():  和xxx_populate()差不多，多了一个判断，最后调用xxx_populate()
 
 # 页表的填写
 
@@ -53,23 +99,76 @@ pgd_offset(mm,addr)+---->| *pgd     |-------->+----------+
 
 总的来讲就是按照虚拟地址来遍历整个页表，根据不同PTE的状态做不同的处理。
 
+## 缺页中断
+
+首先是架构相关的中断处理程序代码：
+
 ```
-handle_mm_fault
-    hugetlb_fault
+exc_page_fault
+  handle_page_fault
+    do_kern_addr_fault
+    do_user_addr_fault
+      vma = lock_vma_under_rcu()              <--- 锁住对应vma
+      handle_mm_fault(FAULT_FLAG_VMA_LOCK)    <--- 架构无关代码
+      vma_end_read()
+
+      ... or
+
+      vma = lock_mm_and_find_vma()            <--- 锁住mmap_lock
+      handle_mm_fault()                       <--- 架构无关代码
+      mmap_read_unlock()
+```
+
+## 架构无关代码
+
+然后就是架构无关的缺页处理代码：
+
+```
+handle_mm_fault(vma, address, flags, regs)
+    hugetlb_fault()                <--- hugetlb处理
     __handle_mm_fault
-        // pmd level
-        create_huge_pmd
-        do_huge_pmd_numa_page
-        wp_huge_pmd
+        // pud/pmd level
         // pte level
-        handle_pte_fault
+        handle_pte_fault           <--- 包括PTE这层页表，和做后的page
             // empty pte
-            do_anonymous_page
-            do_fault
-            // other
+            do_pte_missing
+                do_anonymous_page
+                do_fault
+            // other1
             do_swap_page
             do_numa_page
+            // other2
             do_wp_page
+            pte_mkdirty
+            pte_mkyoung
+```
+
+## 匿名页填写
+
+页表按照映射对象来分主要是两种：
+
+ * 匿名页表
+ * 文件页表
+
+这里我们先看匿名页表 -- do_anonymous_page。
+
+```
+do_anonymous_page()
+  pte_alloc()                        <--- 这里会分配pte这一层页表，如果没有的话
+  // 如果不是写，用zero-page
+  entry = pte_mkspecial(pfn_pte(my_zero_pfn(), ..));
+
+  // 准备匿名映射
+  ret = vmf_anon_prepare()
+    ret = __vmf_anon_prepare(vmf)
+      __anon_vma_prepare(vma)        <--- 分配或者查找相邻可用vma->anon_vma
+    return ret
+  // 准备真正需要映射的内存
+  folio = alloc_anon_folio(vmf);
+    // THP or not
+
+  // 最后设置到pte页表中
+  set_ptes()
 ```
 
 # 页表的释放
@@ -87,3 +186,9 @@ unmap_region
 其中unmap_vmas释放了真正对应的内存，而free_pgtables才释放页表。
 
 写到这里，感觉写完了，估计是很多细节自己还不知道。没事，留着以后有新发现再来挖掘。
+
+# 参考文档
+
+[内核文档 -- page tables][1]
+
+[1]: https://docs.kernel.org/mm/page_tables.html
