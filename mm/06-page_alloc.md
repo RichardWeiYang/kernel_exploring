@@ -22,14 +22,13 @@ start_kernel()
                 free_unused_memmap()                // 释放内存空洞对应的page struct
                 reset_all_zones_managed_pages()     // 清除临时的managed_pages
                 free_low_memory_core_early()
-                    memblock_clear_hotplug(0, -1)
-                    memmap_init_reserved_pages()    // set PageReserved
-                    __free_memory_core()
-                        __free_pages_memory(start_pfn, end_pfn)
-                            memblock_free_pages()
+                    for_each_free_mem_range()
+                        __free_memory_core()
+                            __free_pages_memory(start_pfn, end_pfn)
+                                memblock_free_pages()
 ```
 
-在这个过程中你可以看到熟悉的for_each_free_mem_range()。对了，这就是遍历memory_block的内存信息，来填充page结构体的过程了。
+在这个过程中你可以看到熟悉的for_each_free_mem_range()。对了，这就是遍历空闲memory_block的内存信息，来填充page结构体的过程了。
 
 PS: 当有了defer_init后，大部分的page struct初始化由单独的线程调用deferred_init_memmap()[延迟初始化][4]。
 
@@ -202,146 +201,13 @@ __find_buddy_index(unsigned long page_idx, unsigned int order)
 
 到这里，就到这里，休息休息~
 
-# 分配内存的顺序--zonelist
-
-其实我有点纠结，这部分内容要放在哪里。放在这，因为正好讲了node和zone的关系。但是内存分配的内容是在下一节涉及，所以放在这里又感觉有点早。
-
-暂且先放在这里吧，以后哪天觉得不合适了，我再来调整。
-
-内存按照Node/Zone划分的目的最终还是要为分配/回收服务。毕竟内存是有限的，所以分配时有一个需求就是按照什么样的顺序从node/zone上去分配内存。zonelist就是这样一个按照zone顺序排好的链表。在分配的时候，如果某个zone找不到可用内存，就按照zonelist上的顺序挨个寻找。
-
-OK，好像一句话就说完了。还是亲眼渐渐zonelist的模样吧。
-
-```
-   node_data[]
-   +-----------------------------+
-   |node_zonelists[MAX_ZONELISTS]|
-   |   (struct zonelist)         |
-   |   +-------------------------+
-   |   |_zonerefs[]              | = MAX_NUMNODES * MAX_NR_ZONES + 1
-   |   | (struct zoneref)        | Node 0:
-   |   |  +----------------------+    [ZONE_NORMAL]        [ZONE_DMA32]         [ZONE_DMA]
-   |   |  |zone                  |    +---------------+    +---------------+    +---------------+
-   |   |  |   (struct zone*)     |    |               |    |               |    |               |
-   |   |  |zone_idx              |    |               |    |               |    |               |
-   |   |  |   (int)              |    +---------------+    +---------------+    +---------------+
-   +---+--+----------------------+
-                                   Node 1:
-
-                                      [ZONE_NORMAL]        [ZONE_DMA32]         [ZONE_DMA]
-                                      +---------------+    +---------------+    +---------------+
-                                      |               |    |               |    |               |
-                                      |               |    |               |    |               |
-                                      +---------------+    +---------------+    +---------------+
-```
-
-所以每个node_data上都有自己的zonelist，用来表示在该numa节点上分配内存时如何按照zone找到空闲内存的顺序。
-
-## 构造zonelist的代码在哪里
-
-虽然构造zonelist的代码不复杂，不过我们还是看看这部分是在哪里做的。
-
-```
-mm_core_init()
-    build_all_zonelists(NULL)
-        build_all_zonelists_init()
-            __build_all_zonelists(NULL)
-                write_seqlock_irqsave(&zonelist_update_seq, flags);
-                build_zonelists(pgdat);
-                    build_zonelists_in_node_order(pgdat, node_order, nr_nodes);
-                    build_thisnode_zonelists(pgdat);
-                write_sequnlock_irqrestore(&zonelist_update_seq, flags);
-```
-
-## 如何做到节点按照round robin排序
-
-commit 54d032ced98378bcb9d32dd5e378b7e402b36ad8 描述了之前内核中的一个bug。在多numa节点情况下，zonelist并没有按照round robin的顺序排列，从而导致了内存访问差异。我们来看下原因。
-
-假设有一个4个numa节点的机器，节点之间的distance如下。
-
-```
-Node 0  1  2  3
-----------------
-0    10 12 32 32
-1    12 10 32 32
-2    32 32 10 12
-3    32 32 12 10
-```
-
-在改动前，每个节点的zonelist上nume节点顺序如下：
-
-```
-Node  Fallback list
----------------------
-0     0 1 2 3
-1     1 0 3 2
-2     2 3 0 1
-3     3 2 0 1 <-- Unexpected fallback order
-```
-
-可以看到在numa节点2/3上的zonelist顺序是一样的。这样导致在2/3节点上访问远端内存时都先从0上分配。
-
-这样会有两个问题：
-
-  * 软件层面，对0上pgdat/zone/page的访问增加，竞争增加
-  * 硬件层面，内存带宽可能打满
-
-所以期望的情况每个节点的zonelist上numa节点顺序如下：
-
-```
-Node Fallback list
-------------------
-0    0 1 2 3
-1    1 0 3 2
-2    2 3 0 1
-3    3 2 1 0
-```
-
-可以看出，zonelist的顺序是按照distance排序的，且如果distance相等时，会有round robin的计算。
-
-要做到这点，代码中只做了这么一个改动。
-
-```
--                       node_load[node] = load;
-+                       node_load[node] += load;
-```
-
-这样就可以把之前找出来过的节点放到列表的后面了。
-
-## 遍历zonelist
-
-既然讲到了zonelist的构建，就顺便看一下遍历吧。
-
-遍历zonelist主要是在__alloc_pages()函数，目的就是为了按照顺序找到有空闲内存的zone进行分配：
-
-  * preferred_zoneref = first_zones_zonelist()
-  * for_next_zone_zonelist_nodemask()
-
-## 无锁更新
-
-自从有了内存热插拔后，zonelist就面临着一个问题：
-
-  * 更新zonelist是否需要持锁
-
-因为在分配页的时候需要遍历zonlist，这就意味着如果持锁更新，就会影响到整个系统的性能。
-
-我查看了一下历史更新，发现这个事情还是挺有意思的。下面是相关的commit：
-
-  * 6811378e7d8b 2006-06-23 [PATCH] wait_table and zonelist initializing for memory hotadd: update zonelists
-  * 4eaf3f64397c 2010-05-25 mem-hotplug: fix potential race while building zonelist for new populated zone
-  * 9d3be21bf9c0 2017-09-06 mm, page_alloc: simplify zonelist initialization
-  * 11cd8638c37f 2017-09-06 mm, page_alloc: remove stop_machine from build_all_zonelists
-  * b93e0f329e24 2017-09-06 mm, memory_hotplug: get rid of zonelists_mutex
-
-从历史记录来看，最开始是有锁的。到现在其实把锁去掉了。
-
-# 释放
+# 释放页
 
 通常我们都是先讲分配，再讲释放的。但是这次要到过来。为什么呢，因为在free_all_bootmem()中就是调用了内存释放的方法来初始化page结构的。所以还是先来看看释放吧。
 
 我们通常使用的函数是free_pages()。但是最后都调用到了函数__free_one_page()。这个函数其实比较简单，就是算的东西稍微有点绕。我们都知道页分配器中使用的是伙伴系统，也就是相邻的两个页是一对儿。所以在释放的时候，会去判断自己的伙伴是不是也是空闲的。如果是的话，那就做合并。且继续判断。
 
-关于伙伴查找的算法，后面详细讲。有兴趣的可以仔细看。
+关于伙伴查找的算法，上文中我们已经看过了。
 
 那最后释放到哪里了呢？
 
@@ -401,9 +267,29 @@ done_merging:
 这两个都是先减去引用计数，再调用free_unref_page。
 这两者有细微的差别，具体可以看__free_pages的注释。
 
-# 分配
+# 分配页
 
-页分配的核心函数是__alloc_pages_noprof()。正如函数的注释上写的"This is the 'heart' of the zoned buddy allocator."。
+## 分配页的核心接口
+
+页分配的核心函数是__alloc_frozen_pages_noprof()。正如函数的注释上写的"This is the 'heart' of the zoned buddy allocator."。
+
+看一下这个函数的声明：
+
+```
+struct page *__alloc_frozen_pages_noprof(gfp_t gfp, unsigned int order,
+		int preferred_nid, nodemask_t *nodemask)
+```
+
+这个函数一共就四个参数：
+
+  * gfp
+  * order
+  * preferred_nid
+  * nodemask
+
+所以不管上层有什么样的配置，到了buddy system都体现在这四个方面去做分配。
+
+其中preferred_nid/nodemask主要由[mempolicy][6]控制, 而GFP参数在[GFP功效][7]中讲解。
 
 在[Node->Zone->Page][2]中我们已经看到了，内存被分为了node，zone来管理。这么管理的目的也就是为了在分配的时候，能能够找到合适的内存。所以在分配的时候，就是按照优先级搜索node和zone，如果找到匹配的zone则在该zone的free_area链表中取下一个。
 
@@ -412,9 +298,140 @@ done_merging:
 * 按照什么顺序从zone上分配内存
 * 怎么判断应该要去下一个zone上去找
 
-第一个问题我们前面看到过了，就是zonelist。而第二个问题是由[水线][5]来判断的。这涉及到了内存回收，已经是另一个课题了。
+第一个问题我们将在下面展开说说，就是zonelist。而第二个问题是由[水线][5]来判断的。这涉及到了内存回收，已经是另一个课题了。
 
 和释放内存对称，分配的时候也可能会分配到高阶的page。如果发生这种情况，则会将高阶部分内存拆分到低阶的page，再放回到对应的free_area中。这部分代码可以看__rmqueue_smallest()。
+
+## 分配的顺序--zonelist
+
+现在我们来看看分配时按照什么顺序从node/zone上找空闲内存的。
+
+内存按照Node/Zone划分的目的最终还是要为分配/回收服务。毕竟内存是有限的，所以分配时有一个需求就是按照什么样的顺序从node/zone上去分配内存。zonelist就是这样一个按照zone顺序排好的链表。在分配的时候，如果某个zone找不到可用内存，就按照zonelist上的顺序挨个寻找。
+
+OK，好像一句话就说完了。还是亲眼渐渐zonelist的模样吧。
+
+```
+   node_data[]
+   +-----------------------------+
+   |node_zonelists[MAX_ZONELISTS]|
+   |   (struct zonelist)         |
+   |   +-------------------------+
+   |   |_zonerefs[]              | = MAX_NUMNODES * MAX_NR_ZONES + 1
+   |   | (struct zoneref)        | Node 0:
+   |   |  +----------------------+    [ZONE_NORMAL]        [ZONE_DMA32]         [ZONE_DMA]
+   |   |  |zone                  |    +---------------+    +---------------+    +---------------+
+   |   |  |   (struct zone*)     |    |               |    |               |    |               |
+   |   |  |zone_idx              |    |               |    |               |    |               |
+   |   |  |   (int)              |    +---------------+    +---------------+    +---------------+
+   +---+--+----------------------+
+                                   Node 1:
+
+                                      [ZONE_NORMAL]        [ZONE_DMA32]         [ZONE_DMA]
+                                      +---------------+    +---------------+    +---------------+
+                                      |               |    |               |    |               |
+                                      |               |    |               |    |               |
+                                      +---------------+    +---------------+    +---------------+
+```
+
+所以每个node_data上都有自己的zonelist，用来表示在该numa节点上分配内存时如何按照zone找到空闲内存的顺序。
+
+### 构造zonelist的代码在哪里
+
+虽然构造zonelist的代码不复杂，不过我们还是看看这部分是在哪里做的。
+
+```
+mm_core_init()
+    build_all_zonelists(NULL)
+        build_all_zonelists_init()
+            __build_all_zonelists(NULL)
+                write_seqlock_irqsave(&zonelist_update_seq, flags);
+                build_zonelists(pgdat);
+                    build_zonelists_in_node_order(pgdat, node_order, nr_nodes);
+                    build_thisnode_zonelists(pgdat);
+                write_sequnlock_irqrestore(&zonelist_update_seq, flags);
+```
+
+### 如何做到节点按照round robin排序
+
+commit 54d032ced98378bcb9d32dd5e378b7e402b36ad8 描述了之前内核中的一个bug。在多numa节点情况下，zonelist并没有按照round robin的顺序排列，从而导致了内存访问差异。我们来看下原因。
+
+假设有一个4个numa节点的机器，节点之间的distance如下。
+
+```
+Node 0  1  2  3
+----------------
+0    10 12 32 32
+1    12 10 32 32
+2    32 32 10 12
+3    32 32 12 10
+```
+
+在改动前，每个节点的zonelist上nume节点顺序如下：
+
+```
+Node  Fallback list
+---------------------
+0     0 1 2 3
+1     1 0 3 2
+2     2 3 0 1
+3     3 2 0 1 <-- Unexpected fallback order
+```
+
+可以看到在numa节点2/3上的zonelist顺序是一样的。这样导致在2/3节点上访问远端内存时都先从0上分配。
+
+这样会有两个问题：
+
+  * 软件层面，对0上pgdat/zone/page的访问增加，竞争增加
+  * 硬件层面，内存带宽可能打满
+
+所以期望的情况每个节点的zonelist上numa节点顺序如下：
+
+```
+Node Fallback list
+------------------
+0    0 1 2 3
+1    1 0 3 2
+2    2 3 0 1
+3    3 2 1 0
+```
+
+可以看出，zonelist的顺序是按照distance排序的，且如果distance相等时，会有round robin的计算。
+
+要做到这点，代码中只做了这么一个改动。
+
+```
+-                       node_load[node] = load;
++                       node_load[node] += load;
+```
+
+这样就可以把之前找出来过的节点放到列表的后面了。
+
+### 遍历zonelist
+
+既然讲到了zonelist的构建，就顺便看一下遍历吧。
+
+遍历zonelist主要是在__alloc_pages()函数，目的就是为了按照顺序找到有空闲内存的zone进行分配：
+
+  * preferred_zoneref = first_zones_zonelist()
+  * for_next_zone_zonelist_nodemask()
+
+### 无锁更新
+
+自从有了内存热插拔后，zonelist就面临着一个问题：
+
+  * 更新zonelist是否需要持锁
+
+因为在分配页的时候需要遍历zonlist，这就意味着如果持锁更新，就会影响到整个系统的性能。
+
+我查看了一下历史更新，发现这个事情还是挺有意思的。下面是相关的commit：
+
+  * 6811378e7d8b 2006-06-23 [PATCH] wait_table and zonelist initializing for memory hotadd: update zonelists
+  * 4eaf3f64397c 2010-05-25 mem-hotplug: fix potential race while building zonelist for new populated zone
+  * 9d3be21bf9c0 2017-09-06 mm, page_alloc: simplify zonelist initialization
+  * 11cd8638c37f 2017-09-06 mm, page_alloc: remove stop_machine from build_all_zonelists
+  * b93e0f329e24 2017-09-06 mm, memory_hotplug: get rid of zonelists_mutex
+
+从历史记录来看，最开始是有锁的。到现在其实把锁去掉了。
 
 # 引用计数
 
@@ -479,3 +496,5 @@ check_new_page()
 [3]: /virtual_mm/02-thp_mapcount.md
 [4]: /mm/54-defer_init.md
 [5]: /mm_reclaim/02-watermark.md
+[6]: /virtual_mm/07-mempolicy.md
+[7]: /mm/12-gfp_usage.md
