@@ -131,8 +131,14 @@ PS: free_area_init()中也有相关的日志输出。
 
 ```
 free_area_init()
+    arch_zone_lowest_possible_pfn[]     // 划分zone的边界
+    arch_zone_highest_possible_pfn[]
+    find_zone_movable_pfns_for_nodes();
+
     free_area_init_node(nid)            // 初始化node/zone，设置每个node/zone的范围
         calculate_node_totalpages()     // 计算出node/zone的大小和边界
+            zone_spanned_pages_in_node()
+                adjust_zone_range_for_zone_movable() // 根据movable zone调整
         free_area_init_core(pgdat)
             zone_init_internals(zone, j, nid, freesize)
             init_currently_empty_zone(zone, zone_start_pfn, size)
@@ -156,6 +162,37 @@ free_area_init()
 内核启动过程中，我们可以通过free_area_init()中输出的日志观察每个node/zone所使用的区域。
 
 日志中搜索的关键字是："Zone ranges:"， "Early memory node ranges"。
+
+运行起来后，能在文件/proc/zoneinfo中看到更多的数据。
+
+# ZONE_MOVABLE
+
+这次花了点时间看了下ZONE_MOVABLE，本来以为这个zone和其他的没有什么区别。实际不然。
+
+这个zone的大小，在x86上，是计算出来的，而不是像其他的zone有明确的事先边界。这里我把和ZONE_MOVABLE计算相关的代码在下面着重标出来。
+
+```
+free_area_init()
+    arch_zone_lowest_possible_pfn[]
+    arch_zone_highest_possible_pfn[]
+    find_zone_movable_pfns_for_nodes();              // 根据配置计算ZONE_MOVABLE的边界
+
+    free_area_init_node(nid)
+        calculate_node_totalpages()
+            zone_spanned_pages_in_node()
+                adjust_zone_range_for_zone_movable() // 根据movable zone调整其他zone的边界
+
+    ...
+```
+
+## 开启ZONE_MOVABLE的方式
+
+默认情况下我们看不到这个zone的存在，有下面几种方式可以开启：
+
+* movable_node
+* kernelcore=50%
+
+其实都是在内核命令行里加参数，具体可以看函数find_zone_movable_pfns_for_nodes()。全都在里面了。
 
 # 思考题
 
