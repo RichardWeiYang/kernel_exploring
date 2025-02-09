@@ -79,7 +79,7 @@ page, can return a list of PTEs which point to that page.
                                  +--------------+
 ```
 
-一个vma要包含多个页，所以有多个页的mapping指向同一个vma。加上page->index，这样就可以定位到对应的pte。
+一个vma要包含多个页，所以有多个页的mapping指向同一个vma。加上**page->index**，这样就可以定位到对应的pte。
 
 当进程进行fork后，情况就变得复杂了。下图做了一个解释：
 
@@ -257,7 +257,7 @@ commit 5beb49305251e5669852ed541e8e2f2f7696c53e
              .......................      *************************
              .                     .      *                       *
      av      v                 avc v      v                vma    v
-     +-----------+             +-------------+            >+-------------+
+     +-----------+             +-------------+             +-------------+
  C2  |           |<------------|anon_vma  vma|------------>|             |
      |           |             |             |             |             |
      +-----------+             +-------------+           ->+-------------+
@@ -451,7 +451,7 @@ commit 7a3ef208e662f4b63d43a23f61a64a129c525bbc
     when it searches where page is might be mapped.
 ```
 
-真个patch的东西不多，但着实让我花了点时间去理解。下面我列举一些我的理解。
+这个patch的东西不多，但着实让我花了点时间去理解。下面我列举一些我的理解。
 
 ```
 @@ -188,6 +190,8 @@ int anon_vma_prepare(struct vm_area_struct *vma)
