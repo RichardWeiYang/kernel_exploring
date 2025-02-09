@@ -62,7 +62,16 @@ node_zonelists是pgdat中的一个成员，乍一看有点复杂，但实际上�
 
 ## gfp_zone()
 
-上面我们看到了从zone中分配内存的一个顺序，但是我们是怎么去指定最合适的zone的呢？那就是gfp_zone()这个函数了。在prepare_alloc_pages函数中就调用了gfp_zone()从gfp中解析处最合适的zone。
+上面我们看到了从zone中分配内存的一个顺序，但是我们是怎么去指定最合适的zone的呢？那就是gfp_zone()这个函数了。在prepare_alloc_pages函数中就调用了gfp_zone()从gfp中解析处最合适的zone。然后在for_next_zone_zonelist_nodemask()中，限制了最高可使用的zoeindex。
+
+```
+__alloc_frozen_pages_noprof(gfp, order, preferred_nid, nodemask)
+    prepare_alloc_pages(gfp, ..., &ac, ...)
+        ac->highest_zoneidx = gfp_zone(gfp_mask);
+    page = get_page_from_freelist(..., &ac)
+        for_next_zone_zonelist_nodemask(zone, z, ac->highest_zoneidx, ac->nodemask) {
+        }
+```
 
 内核开发者将zone的信息巧妙得编码在了gfp中，就让我们来看看这个编码解码的过程吧。
 
