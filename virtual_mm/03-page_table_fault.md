@@ -166,6 +166,8 @@ do_anonymous_page()
   // 准备真正需要映射的内存
   folio = alloc_anon_folio(vmf);
     // THP or not
+    folio_prealloc(, vma, vmf->address, true)
+      vma_alloc_folio(GFP_HIGHUSER_MOVABLE, )    <-- 指定了可用的zone
 
   // 最后设置到pte页表中
   set_ptes()
