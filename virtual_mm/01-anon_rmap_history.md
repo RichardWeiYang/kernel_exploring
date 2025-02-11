@@ -157,6 +157,8 @@ commit 5beb49305251e5669852ed541e8e2f2f7696c53e
   * avc: anon_vma_chain
   * vma: vm_area_struct
 
+## 第一个进程创建时
+
 当进程第一个分配匿名页时，这个结构看上去像下面的图示：
 
 ```
@@ -180,8 +182,11 @@ commit 5beb49305251e5669852ed541e8e2f2f7696c53e
 
 目前版本中，save_vma还是链表，而same_anon_vma替换成了一个红黑树。原因因该是有了reuse后，一个anon_vma下会有多个vma，这样用红黑树去组织更利于查找到需要的vma。
 
-所以当进程再分配一个属于另一个vma但在同一个anon_vma区域的匿名页，这个结构的状态如下：
-PS: 这种情况发生在可以重用anon_vma的时候，见find_mergeable_anon_vma()。要求原来的vma和新的紧临，并且还没有被reuse过。
+## 同一进程内av重用
+
+同一进程内，可以重用anon_vma，具体见find_mergeable_anon_vma()。要求原来的vma和新的紧临，并且还没有被reuse过。
+
+如果满足这个条件，此时的结构如图。
 
 ```
                   same_anon_vma           same_vma   anon_vma_chain
@@ -209,7 +214,9 @@ PS: 这种情况发生在可以重用anon_vma的时候，见find_mergeable_anon_
              .......................      *************************
 ```
 
-链表还是那个链表，就是比之前胖了一点。
+此时我们就可以看出为什么same_anon_vma要变成红黑树了。这样我们在同一个av下，就可以根据地址去找到avc，而不是遍历所有的avc。
+
+## 进程fork后的变化
 
 现在是时候看一下fork下的情况了。
 
@@ -260,6 +267,8 @@ PS: 这种情况发生在可以重用anon_vma的时候，见find_mergeable_anon_
   * 另外子进程av->root和父进程的av->root一样
 
 这样，当我们寻找某个内存都映射到哪些进程中时，就可以通过父进程的anon_vma上same_anon_vma来找到子进程也映射了某个页面。
+
+## 进程fork了两个子进程
 
 接着我们挑战一下有两个fork的时的情形。
 
@@ -327,6 +336,8 @@ PS: 这种情况发生在可以重用anon_vma的时候，见find_mergeable_anon_
 上图显示了对称的美感，当然更重要的是显示了一个匿名页如何通过anon_vma->same_anon_vma来找到所有映射到自己的进程。不过问题是，这么一个设计对之前的实现来讲究竟改进在哪里？
 
 我认为改进发生在COW之后。比如，如果C1的匿名页发生了COW，新的匿名页page->mapping就会指向C1的anon_vma而不是P的。这样当我们想要查询这个新的匿名页的映射情况，就不需要从根上找了。
+
+## 子进程发生fork时
 
 接着再进一步，我很好奇当子进程发生fork时的情形。
 
@@ -398,7 +409,7 @@ PS: 这种情况发生在可以重用anon_vma的时候，见find_mergeable_anon_
     * 不论是多深的子进程，都会给子进程的vma创建一个avc链接到根进程的same_anon_vma上
     * 对一个多层次的子进程，vma会链接进所有父进程的anon_vma。所以GC进程中vma->same_vma链表上有三个节点。两个父辈，一个自己。
 
-## Page -> vma
+## 如何从Page找到vma和page table
 
 经过了这么多的重构，看上去我们已经离我们的初始目标有点远了。
 
