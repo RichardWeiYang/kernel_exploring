@@ -221,6 +221,7 @@ commit 5beb49305251e5669852ed541e8e2f2f7696c53e
 现在是时候看一下fork下的情况了。
 
 ```
+                  same_anon_vma           same_vma   anon_vma_chain
              .......................      *************************
              .                     .      *                       *
      av      v                 avc v      v                src    v
@@ -234,7 +235,7 @@ commit 5beb49305251e5669852ed541e8e2f2f7696c53e
              .            \        .
              .                     .
              .             \       .
-             .                     .
+             .                     .      same_vma   anon_vma_chain
              .              \      .      *************************
              .                     .      *                       *
              .               \ avc v      v                       *
