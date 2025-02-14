@@ -18,9 +18,12 @@
 
 [Maple Tree][6]
 
+[Interval Tree][7]
+
 [1]: /data_struct/01-list.md
 [2]: /data_struct/03-plist.md
 [3]: /data_struct/02-hlist.md
 [4]: /data_struct/04-xarray.md
 [5]: /data_struct/05-btree.md
 [6]: /data_struct/06-maple_tree.md
+[7]: /data_struct/07-interval_tree.md

@@ -120,6 +120,7 @@
   * [xarray](data_struct/04-xarray.md)
   * [B树](data_struct/05-btree.md)
   * [Maple Tree](data_struct/06-maple_tree.md)
+  * [Interval Tree](data_struct/07-interval_tree.md)
 * [同步机制](synchronization/00-index.md)
   * [内存屏障](synchronization/02-memory_barrier.md)
   * [RCU](synchronization/01-rcu.md)
