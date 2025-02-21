@@ -38,7 +38,14 @@
 
 [内存热插拔][3]
 
+# 连续内存分配器
+
+不少设备需要很大，如10M，的连续内存。现有的page allocator无法满足这样的需求。
+
+所以内核中增加了[连续内存分配器][5]。
+
 [1]: /mm/51-scalability_design_implementation.md
 [2]: /mm/52-where_is_page_struct.md
 [3]: /mm/53-memory_hotplug.md
 [4]: /mm/54-defer_init.md
+[5]: /mm/55-cma.md
