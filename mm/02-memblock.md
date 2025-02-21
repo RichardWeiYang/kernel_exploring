@@ -75,12 +75,16 @@ PS:其实我隐藏了一个很重要的信息，不过现在暂时不需要看�
 start_kernel()
     setup_arch()
         e820__memory_setup()
+            max_pfn = e820__end_of_ram_pfn()
         memblock_set_current_limit(ISA_END_ADDRESS)
         e820__memblock_setup()
             memblock_add()
                 memblock_add_range(&memblock.memory, base, size, MAX_NUMNODES, 0)
             memblock_dump_all()
-        init_mem_mapping()                           // 设置内核页表
+        init_mem_mapping()                           // 设置内核页表(direct mapping)
+            end = max_pfn << PAGE_SHIFT;
+            memory_map_bottom_up(kernel_end, end);
+                max_pfn_mapped = max(max_pfn_mapped, end_pfn)
         memblock_set_current_limit(get_max_mapped())
 
         initmem_init() -> x86_numa_init() -> numa_init()
@@ -90,6 +94,9 @@ start_kernel()
                 memblock_set_node()                  // 再根据numa信息设置真实的node
                 alloc_node_data(nid)                 // allocate pgdata for each node with memory
                     node_set_online(nid)             // 因为只有有内存的node才会分配，所以这里online的都是有内存的
+
+        dma_contiguous_reserve(max_pfn_mapped..)     // 给dma分好cma区域,好像把所有的内存都包近来了
+
         x86_init.paging.pagetable_init() -> paging_init()
             sparse_init()
             zone_size_init()
@@ -104,13 +111,17 @@ start_kernel()
                 reset_all_zones_managed_pages()
                 free_low_memory_core_early()
                     memmap_init_reserved_pages()     // 设置PageReserved
+                        reserve_bootmem_region()     // 初始化预留页的page（不受defer_init影响）
                     __free_memory_core()             // release free pages to buddy
     rest_init()
         kernel_init()
             kernel_init_freeable()
                 page_alloc_init_late()
+                    deferred_init_memmap()           // 延迟初始化 page struct，并释放到buddy
                     memblock_discard()               // discard region array
                 do_basic_setup()
+                    do_initcalls()
+                        cma_init_reserved_areas()    // 释放cma到buddy
                     init_per_zone_wmark_min()
                         setup_per_zone_wmarks()      // 初始化wmark
             free_initmem()

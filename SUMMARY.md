@@ -50,6 +50,7 @@
       * [海量内存](mm/52-where_is_page_struct.md)
       * [延迟初始化](mm/54-defer_init.md)
       * [内存热插拔](mm/53-memory_hotplug.md)
+      * [连续内存分配器](mm/55-cma.md)
   * [虚拟内存空间](virtual_mm/00-index.md)
     * [页表和缺页中断](virtual_mm/03-page_table_fault.md)
     * [虚拟地址空间的管家--vma](virtual_mm/05-vma.md)
