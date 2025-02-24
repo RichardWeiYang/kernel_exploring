@@ -111,11 +111,14 @@ start_kernel()
                 reset_all_zones_managed_pages()
                 free_low_memory_core_early()
                     memmap_init_reserved_pages()     // 设置PageReserved
+                        memblock_set_node()          // 设置memblock.reserved中的nid信息
                         reserve_bootmem_region()     // 初始化预留页的page（不受defer_init影响）
                     __free_memory_core()             // release free pages to buddy
+        kmem_cache_init()                            // 可以用slab了
     rest_init()
         kernel_init()
             kernel_init_freeable()
+                smp_init()                           // 在这之前只有单线程, memblock分配只能发生在这之前
                 page_alloc_init_late()
                     deferred_init_memmap()           // 延迟初始化 page struct，并释放到buddy
                     memblock_discard()               // discard region array
