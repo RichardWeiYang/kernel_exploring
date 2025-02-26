@@ -2,9 +2,9 @@
 
 反向映射一直是一个非常神奇的存在，今天我们就好好探索一下这个知识点。
 
-# 创建
+# 相关数据结构
 
-在反向匿名映射中出了page struct，一共有三个相关的数据结构：
+在反向匿名映射中除了page struct，一共有三个相关的数据结构：
 
   * vm_area_struct
   * anon_vma
@@ -78,11 +78,11 @@
 
 空口无凭，眼见为实。那为什么会长成这样的呢？ 接下来我们就来看看在内核中我们是如何将这些数据结构链接起来的。
 
-# 链接
+# 三种链接anon_vma/vma的情况
 
 上一节的最后，我们看到了三个重要的数据结构通过链表和树连接在了一起，这一节我们就来看看他们是怎么连接起来的。
 
-## anon_vma_chain_link()
+链接的核心函数是 anon_vma_chain_link()
 
 往简单了讲，要连接这三个重要的数据结构，都靠一个函数： anon_vma_chain_link(vma, avc, anon_vma)。而这个函数本身简单到令人发指，以至于我能把整个定义给大家展示出来。
 
@@ -104,18 +104,17 @@
 
 接下来我们将从anon_vma_chain_link()函数被调用的关系入手，去看看在实际运行中究竟会演化出什么样的变化来。
 
-## do_anonymous_page()
+## __anon_vma_prepare()
 
-首先出场的是函数do_anonymous_page，这个函数是在匿名页缺页中断时会调用的函数。
+首先出场的是函数__anon_vma_prepare().
 
 ```
-    do_anonymous_page(vmf)
-        __anon_vma_prepare(vma)
-            avc = anon_vma_chain_alloc()
-            anon_vma = find_mergeable_anon_vma(vma)
-            anon_vma = anon_vma_alloc()
-            vma->anon_vma = anon_vma
-            anon_vma_chain_link(vma, avc, anon_vma)
+   __anon_vma_prepare(vma)
+       avc = anon_vma_chain_alloc()
+       anon_vma = find_mergeable_anon_vma(vma)      // 先找mergeable的
+       anon_vma = anon_vma_alloc()                  // 找不到再分配
+       vma->anon_vma = anon_vma
+       anon_vma_chain_link(vma, avc, anon_vma)
 ```
 
 从上面的流程可以看出，当发生缺页中断时，内核会给对应的vma构造anon_vma，并且利用avc去链接这两者。这种可以说是系统中最简单的例子，也是上图中显示的情况。
@@ -150,6 +149,19 @@
 
 其实此处我画得不够精确，av 和 avc之间应当是树的关系，而不是现在显示的链表的关系。但是我想意思已经表达清楚，即在一个进程中多个vma可以共享同一个anon_vma作为匿名映射的节点。
 
+## anon_vma_clone()
+
+第二个出场的是函数anon_vma_clone().
+
+```
+   anon_vma_clone(dst, src)
+       avc = anon_vma_chain_alloc()
+       anon_vma = pavc->anon_vma
+       anon_vma_chain_link(dst, avc, anon_vma)
+```
+
+这个函数的作用是将dst和父进程中的src的anon_vma链接起来。具体的图解在下一节看。
+
 ## anon_vma_fork()
 
 看过了在单个进程中的情况，接下来我们来看看创建一个子进程时如何调整这个数据结构。这个过程由anon_vma_fork处理。
@@ -157,12 +169,14 @@
 ```
     anon_vma_fork(vma, pvma)
         anon_vma_clone(vma, pvma)
+        if (vma->anon_vma)                            // 如果clone中已经复用了父亲的anon_vma，直接返回
+            return 0;
         anon_vma = anon_vma_alloc()
         avc = anon_vma_chain_alloc()
         anon_vma->root = pvma->anon_vma->root
         anon_vma->parent = pvma->anon_vma
         vma->anon_vma = anon_vma
-        anon_vma_chain_link(vma, avc, anon_vma)
+        anon_vma_chain_link(vma, avc, anon_vma)       // 链接新增的子进程自己的anon_vma
 ```
 
 这个函数很有意思，我还真是花了些时间去理解它。最开始有点看不清，所以我干脆退回到最简单的状态，也就是当前进程是根进程的时候。此时我才大致的了解了一点fork时究竟发生了什么。
@@ -210,11 +224,11 @@
              .......................      *************************
 ```
 
-P是父进程，C1是他的一个子进程。当发生fork时，page->mapping没有发生改变，所以依然需要能够从父进程的anon_vma上搜索到对应的页表。此时就得在父进程的rb_root树中保留一个子进程的avc。同时子进程又拥有自己的一套anon_vma。
+P是父进程，C1是他的一个子进程。当发生fork时，page->mapping没有发生改变，所以依然需要能够从父进程的anon_vma上搜索到对应的页表。此时就得在父进程的rb_root树中保留一个子进程的avc。同时子进程又拥有自己的一套anon_vma，这样发生cow后，新的page->mapping就可以指向子进程，而不用再从父进程开始找了。
 
 可以说这个真的是非常有意思的。
 
-对了，代码中还有一个函数anon_vma_clone，在这里我就不展开了。留给大家下来思考一下下。
+# 层级关系
 
 ## anon_vma之间的层级关系
 
