@@ -252,6 +252,8 @@ commit 5beb49305251e5669852ed541e8e2f2f7696c53e
 
 此时我们就可以看出为什么same_anon_vma要变成红黑树了。这样我们在同一个av下，就可以根据地址去找到avc，而不是遍历所有的avc。
 
+另外这里要着重强调一点，在判断是否可重用的函数reusable_anon_vma()中判断了list_is_singular(&vma->anon_vma_chain)。这是为什么在__anon_vma_prepare()中，不需要遍历vma->anon_vma_chain做链接的原因。
+
 ## 进程fork后的变化
 
 现在是时候看一下fork下的情况了。
