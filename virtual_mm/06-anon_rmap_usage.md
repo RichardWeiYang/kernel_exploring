@@ -251,6 +251,21 @@ P是父进程，C1是他的一个子进程。当发生fork时，page->mapping没
 
 此时root/parent都指向自己，anon_vma_alloc()初始化如此。并且num_children增加到1。
 
+如果在__anon_vma_prepare()发生了重用，则会是这样。
+
+```
+                     av
+                     +-----------------+<---+
+                 P   |root             |    |
+                     |parent        ---|----+
+                     |                 |
+                     |num_children     | = 1
+                     |num_active_vmas  | = 2
+                     +-----------------+
+```
+
+也就是当前这个anon_vma被写到两个vma->anon_vma中。
+
 然后我们假设这个父进程fork了两个子进程, anon_vma_fork()且anon_vma_clone()没有重用的情况。
 
 ```
@@ -314,8 +329,41 @@ P是父进程，C1是他的一个子进程。当发生fork时，page->mapping没
 ```
 
 这时候就看出root/parent之间的区别了，parent指向上一级，而root指向根。
+而且num_children只用来表示下一层的数量，至于还有多少层就不管了。
+
+## anon_vma和anon_vma_chain之间的关系
+
+除了anon_vma之间有关联，rmap中非常重要的一个关系就是anon_vma和anon_vma_chain之间的联系。因为有这层关系的存在，才能找到一个page被哪些页表映射。
+
+这是一个根在anon_vma的interval tree，而节点是avc。这棵树上连接了所有包含有page->mapping == anon_vma的vma。 (真有点绕。)
+
+但是我觉得这棵树上其实没有很好利用interval tree的能力，因为这棵树上avc所指向的区域大多一致或者相近。
+
+比如fork过程中，子进程的avc链接到父进程的树上。因为子进程和父进程的vma范围一直，所以这两个会挨着很近。这样以此类推，所有子进程都会在根上有一个节点，那父进程这棵树上其实有一堆一样范围的节点。
 
 # 使用
+
+## 连接page <-> anon_vma
+
+这个过程是在发生page fault时，将page->mapping设置到事先分配好并保存在vma中的anon_vma。
+
+比如说在匿名页中断过程中，连接两者的情况如下。其实所有的连接最后都由__folio_set_anon()来完成。
+
+```
+  do_anonymous_page()
+    folio_add_new_anon_rmap(folio, vma, addr, RMAP_EXCLUSIVE)
+      __folio_set_anon(folio, vma, address, exclusive)
+        anon_vma = vma->anon_vma
+	WRITE_ONCE(folio->mapping, (struct address_space *)anon_vma)
+```
+
+## 解开page <-> anon_vma
+
+对应连接，就有解开。 恩，为啥会要解开？
+
+但是有个函数叫__folio_remove_rmap()，我理解一个page加好了mapping后应该就不会变了。不知道这个函数是干啥的。
+
+## 通过anon_vma找到page被映射到的所有进程
 
 好了，到了这里我们已经拥有了一个非常强悍的武器 -- 匿名反向映射。有了他我们就可以指哪打哪了。
 
@@ -327,8 +375,11 @@ P是父进程，C1是他的一个子进程。当发生fork时，page->mapping没
         pgoff_start = page_to_pgoff(page);
             return page_to_index(page)
         pgoff_end = pgoff_start + hpage_nr_pages(page) - 1;
+
+        // 在interval tree中找pgoff_start/pgoff_end之间的avc
         anon_vma_interval_tree_foreach(avc, &anon_vma->rb_root, pgoff_start, pgoff_end)
-        rwc->rmap_one(page, vma, address, rwc->arg) -> do the real work
+          // 接下来就是 try_to_unmap() 来干活了
+          rwc->rmap_one(page, vma, address, rwc->arg) -> 
 ```
 
 有了上面的基础知识，我想看这段代码就不难了。还记得上面看到过的那个rb_root么？对了，我们就是沿着这颗红黑树找到的vma，然后再找到了页表。
