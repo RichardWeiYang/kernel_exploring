@@ -111,7 +111,7 @@ start_kernel()
                 reset_all_zones_managed_pages()
                 free_low_memory_core_early()
                     memmap_init_reserved_pages()     // 设置PageReserved
-                        memblock_set_node()          // 设置memblock.reserved中的nid信息
+                        memblock_set_node()          // 全量设置memblock.reserved中的nid信息
                         reserve_bootmem_region()     // 初始化预留页的page（不受defer_init影响）
                     __free_memory_core()             // release free pages to buddy
         kmem_cache_init()                            // 可以用slab了
