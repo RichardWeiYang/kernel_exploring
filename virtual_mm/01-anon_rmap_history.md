@@ -140,7 +140,7 @@ commit 5beb49305251e5669852ed541e8e2f2f7696c53e.
 
 # Improve anon_vma with anon_vma_chain
 
-内核社区还想对上述版本进行优化。在[The case of the overly anonymous anon_vma][4]中说到，当进程不断fork，如达到1000个子进程每个进程有1000个匿名页时，这个anon_vma链表将会变得非常庞大。因为所有进程树公用同一个anon_vma。
+内核社区还想对上述版本进行优化。在[The case of the overly anonymous anon_vma][4]中说到，当进程不断fork，如达到1000个子进程每个进程有1000个匿名页时，这个anon_vma链表将会变得非常庞大。因为所有进程树共用同一个anon_vma。
 
 社区提出的方案是：给每一个进程创建一个anon_vma，通过新的数据结构anon_vma_chain，把进程树中各自进程的anon_vma链接起来，而不是直接把vma链接起来。
 
@@ -155,6 +155,8 @@ commit 5beb49305251e5669852ed541e8e2f2f7696c53e
   * av: anon_vma
   * avc: anon_vma_chain
   * vma: vm_area_struct
+
+PS: 这个commit后匿名反向映射的大结构就没有变化过了。
 
 ## 父进程某个匿名页发生缺页中断时
 
@@ -583,6 +585,48 @@ commit 7a3ef208e662f4b63d43a23f61a64a129c525bbc
     * LBNL, self-parent root
 
 最初我混淆了第三种用途。
+
+但是这个却是有点难理解，而且还有问题。社区把这个degree拆分成了num_active_vmas和num_children。
+
+commit 2555283eb40d
+"mm/rmap: Fix anon_vma->degree ambiguity leading to double-reuse"
+
+出问题的情况如下：
+
+1. 进程fork了两次，到孙子进程
+2. 这时子进程C退出，导致c_av->degree降为1
+3. 然后孙子进程再fork，GGC就会重用c_av，此时c_av->degree升到2。但是gc_av->degree没变，且有vma指向gc_av。
+4. 然后曾孙子进程再fork，这时候会发现孙子进程的gc_av->degree是1，就会重用它。但目前还有vma指向gc_av，所以不应该重用。
+
+```
+       pav                                pav                                pav                                pav
+       +--------------+<---+              +--------------+<---+              +--------------+<---+              +--------------+<---+
+   P   |root          |    |          P   |root          |    |          P   |root          |    |          P   |root          |    |
+       |parent     ---|----+              |parent     ---|----+              |parent     ---|----+              |parent     ---|----+
+       |              |                   |              |                   |              |                   |              |
+       |degree        | = 3               |degree        | = 3               |degree        | = 3               |degree        | = 3
+       +--------------+<---+              +--------------+<---+              +--------------+<---+              +--------------+<---+
+                ^          |                       ^          |                       ^          |                       ^          |
+                |          |                       |          |                       |          |                       |          |
+       c_av                |              c_av                |              c_av                |              c_av                |
+       +--------------+    |              +--------------+    |              +--------------+    |              +--------------+    |
+   C   |              |    |  unlink      |              |    |  fork    GGC |              |    |  fork    GGC |              |    |
+       |parent     ---|----+  C           |parent     ---|----+  from        |parent     ---|----+  from        |parent     ---|----+
+       |              |                   |              |       GC          |              |       GGC         |              |
+       |degree        | = 2               |degree        | = 1               |degree        | = 2               |degree        | = 2
+       +--------------+<---+              +--------------+<---+              +--------------+<---+              +--------------+<---+
+                ^          |                       ^          |                       ^          |                       ^          |
+                |          |                       |          |                       |          |                       |          |
+       gc_av               |              gc_av               |              gc_av               |              gc_av               |
+       +--------------+    |              +--------------+    |              +--------------+    |              +--------------+    |
+   GC  |              |    |          GC  |              |    |          GC  |              |    |          GC  |              |    |
+       |parent     ---|----+              |parent     ---|----+              |parent     ---|----+          &   |parent     ---|----+
+       |              |                   |              |                   |              |               GGGC|              |
+       |degree        | = 1               |degree        | = 1               |degree        | = 1               |degree        | = 2  <--- wrong
+       +--------------+                   +--------------+                   +--------------+                   +--------------+
+```
+
+所以这次的修复干脆拆成了两个计数器，专门用num_active_vmas来记录是否的当前有vma指向anon_vma。如果没有才能被重用。
 
 [1]: http://lwn.net/2002/0124/kernel.php3
 [2]: https://lwn.net/Articles/23732/
