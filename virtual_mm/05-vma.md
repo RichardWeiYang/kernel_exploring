@@ -35,14 +35,74 @@
 
 这么一看好像也挺简单的了。
 
+# 相关的系统调用
+
+对虚拟空间操作，主要有下面几种系统调用
+
+  * mmap
+  * munmap
+  * mremap
+  * mprotect
+
+## mmap
+
+mmap主要是新增映射映射，但是当用户指定想要映射的地址区间并且该区间覆盖了已有的映射时，则会覆盖原有区间属性。
+
+这个过程的主流程如下：
+
+```
+do_mmap()
+    mmap_region() -> __mmap_region()
+        __mmap_prepare()
+
+        /* Case 1: 是否能和已有相邻的合并 */
+        vma_merge_new_range()
+        /* Case 2: 不能合并则新建一个 */
+        __mmap_new_vma()
+        /* Case 3: 如果属性有变化再来看看是否能和相邻的合并 */
+        vma_merge_existing_range()
+
+        __mmap_complete()
+```
+
+## munmap
+
+释放指定区间的映射。
+
+## mremap
+
+这部分相关的工作是copy_vma()完成的。
+
+```
+do_mremap()
+    mremap_to()
+        move_vma()
+            copy_vma_and_data()
+                copy_vma()
+                move_page_tables()
+```
+
+## mprotect
+
+这部分相关工作是vma_modify()完成的。
+
+```
+do_mprotect_pkey()
+    mprotect_fixup()
+        vma_modify_flags()
+            vma_modify()
+```
+
 # 常用的API
 
 学习一个数据结构，我们就要学习一些对这个数据结构基本的操作方式。我大致将这些操作分成几个类别：
 
   * 分配/释放
   * 查找
-  * 插入/删除
-  * 拆分/整合
+  * 新建
+  * 合并/拆分
+  * 扩张/收缩
+  * 移动
 
 ## 分配/释放
 
@@ -67,34 +127,106 @@
 
 find_vma函数和我们普通的查找还不一样，我们一般想象的是这个函数会返回一个vma，这个vma是覆盖地址addr的。但是你仔细看这个函数，其实返回的vma表示的是第一个满足addr < vm_end条件的。也就是这个addr可能并不在任何vma空间内。
 
-## 合并
+## 新建
+
+如果原有区域空闲，且没有相邻区域可以合并，则会调用__mmap_new_vma()来创建一个vma。
+
+这个估计是最简单的了，直接分配完vma后就插入到mm的maple_tree上了。
+
+## 合并/拆分
 
   * vma_merge_new_range()
   * vma_merge_existing_range()
+  * __split_vma()
 
-### vma_merge_new_range
+这几个是vma操作中经常使用的了，其中合并又分为了两个。
+
+vma_merge_new_range()发生在需要映射的区域还没有对应vma的情况下，而vma_merge_existing_range()则发生在对应vma已经存在的情况下。
+
+前者所要做的是如果相邻的区域可以合并，则只需要让原有的区域把目标区域包含近来就行。
+而后者则查看是否现有的两个相邻区域可以合并。
+
+### vma_merge_existing_range()
+
+这个是已有的一个空间，发生了属性变化后，看看是否能和相邻的空间合并。
+
+这里面有好几种情况，虽然代码的注释里写了，但是我还是想再把他拿出来仔细看一下。
+
+```
+		 |<-------------------->|
+		 |-------********-------|
+		   prev   middle   next
+```
+
+代码里最后在处理时一共有三类的情况：merge_both, merge_left和merge_right。实际上这个分类是根据两个条件来判断的：
+
+  * vmg->start == middle->vm_start
+  * vmg->end   == middle->vm_end
+
+根据这两种条件的组合，一共有四种可能。而第四种可能根本不可能发生merge，所以代码中隐藏了第四类情况的处理是(!merge_left && !merge_right)。只不过对于这种情况代码中直接就返回了。
+
+这样的话我们就可以把这几种情况用一个表展示出来。
+
+```
+                    | vmg->start ==      | vmg->start !=
+                    |   middle->vm_start |   middle->vm_start
+ -------------------+--------------------+---------------------
+   vmg->end ==      | merge_both         | merge_right
+     middle->vm_end |                    |
+ -------------------+--------------------+---------------------
+   vmg->end !=      | merge_left         | just return
+     middle->vm_end |                    |
+ -------------------+--------------------+---------------------
+```
+
+表里只是列出了最有可能的情况，因为仅仅是地址和边界相等这个条件是不够的。
+
+这里也引申除了merge_left/merge_right两个情况中，当另一个地址不在边界上时，会切分middle的情况。
+
+### vma_merge_new_range()
 
 当映射一个新的空间，即这段空间在当前虚拟地址空间中为空，会尝试这个函数。
 
 看看是否能和当前相邻的空间合并。
 
-### vma_merge_existing_range
+```
+		 |<-------------------->|
+		 |-------        -------|
+		   prev   middle   next
+```
 
-这个是已有的一个空间，发生了属性变化后，看看是否能和相邻的空间合并。
+这里的情况和上面的很想，区别在与middle在merge操作前是空的。但是判断的条件依然是比较vmg->start/end和假象的middle->vm_start/end。因为他们之间是相邻的，所以实际比较的值就是prev->vm_end和next->vm_start。
 
-## 拆分
-
-  * split_vma
-
-### split_vma
+### __split_vma()
 
 因为某些原因要把当前已有的某个空间拆成两个。
 
+## 扩张/收缩
+
+  * vma_expand()
+  * vma_shrink()
+
+这两个函数是辅助函数。除了vma_expand()在vma_merge_new_range()中会用到，其他只有在relocate_vma_down()中会用到。
+而且有意思的是vma_shrink()其实只会往前缩，因为在relocate_vma_down()中它只会往前移动。
+
 ## 修改
 
-  * vma_modify()
+  * vma_modify(..., vma, start, end)
 
-通常我们要修改某一段地址空间属性时会用到这个。
+通常我们要修改某一段地址空间属性时会用到这个。如：mprotect()。
+
+其中包含了vma_merge_existing_range()和split_vma()两种可能。
+
+值得注意的是vma_modify()所修改的区域[start, end]一定是在vma规定的范围内的。这样它才能用split_vma()来切分。
+
+## 移动
+
+  * copy_vma()
+
+这个名字实际上有点迷惑性，因为如果值是复制vma_area_dup()就可以了。真正的含义是移动vma。
+
+这个首先确保了目标区域是空闲的，然后先通过vma_merge_new_range()看看是否能和现有的合并，如果不行则用vm_area_dup()复制一个。
+
 
 # 迭代器
 
