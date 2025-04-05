@@ -448,7 +448,7 @@ PS: 有可能缺少hwloc库。可以通过apt install libhwloc-dev安装。
   * mmap1_process
   * mmap1_threads
 
-这两个可执行程序，所以如果你想更直接点，那就直接运行这两个可执行文件把。
+这两个可执行程序，所以如果你想更直接点，那就直接运行这两个可执行文件吧。
 
 一般执行会加参数，可以参照runtest.py脚本中的参数，也可以运行./mmap1_process -h获得运行帮助。
 
