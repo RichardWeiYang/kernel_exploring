@@ -74,6 +74,9 @@
   * 通用
     * [常用全局变量](mm/common/00_global_variable.md)
     * [常用转换](mm/common/01_important_transform.md)
+  * 测试
+    * [功能测试](mm/tests/01_functional_test.md)
+    * [性能测试](mm/tests/02_performance_test.md)
 * [中断和异常](interrupt_exception/00-start_from_hardware.md)
   * [从IDT开始](interrupt_exception/01-idt.md)
   * [中断？异常？有什么区别](interrupt_exception/02-difference.md)
