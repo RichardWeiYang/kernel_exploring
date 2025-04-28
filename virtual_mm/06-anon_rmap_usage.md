@@ -395,6 +395,12 @@ num_active_vmas就有点意思，有几种情况：
 
 ```
 try_to_unmap(folio, flags)
+    struct rmap_walk_control rwc = {
+        .rmap_one = try_to_unmap_one,
+        .arg = (void *)flags,
+        .done = folio_not_mapped,
+        .anon_lock = folio_lock_anon_vma_read,
+    };
     rmap_walk_anon(folio, rwc, true/false)
         anon_vma = page_anon_vma(page), get anon_vma from page->mapping
         pgoff_start = page_to_pgoff(folio);
@@ -406,9 +412,12 @@ try_to_unmap(folio, flags)
 	    address = vma_address(vma, ...)
             // 接下来就是 try_to_unmap_one() 来干活了
             rwc->rmap_one(page, vma, address, rwc->arg) -> try_to_unmap_one()
+            // 通过folio_not_mapped()判断是否还有用户台映射
+            // 如果没有则不需要继续遍历anon_vma->rb_root了
+            if (rwc->done(folio)) break;
 ```
 
 有了上面的基础知识，我想看这段代码就不难了。还记得上面看到过的那个rb_root么？对了，我们就是沿着这颗红黑树找到的符合区间的vma，然后调用try_to_unmap_one()将page从进程页表中释放。
 
-不过这里值的注意的是，anon_vma这棵树上的vma中有可能对应的page已经发生了cow而不是原有的链接上来的了。所以在try_to_unmap_one()中，还要确定folio目前是不是还在当前进程中。这个检查的过程在page_vma_mapped_walk()中完成。
+不过这里值的注意的是，anon_vma这棵树上的vma中有可能对应的page已经发生了cow而不是原有的链接上来的了。所以在try_to_unmap_one()中，还要确定folio目前是不是还在当前vma。这个检查的过程在page_vma_mapped_walk()中完成。
 
