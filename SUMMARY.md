@@ -120,6 +120,7 @@
   * [内核热补丁的黑科技](tracing/05-kernel_live_patch.md)
   * [eBPF初探](tracing/01-ebpf.md)
   * [TraceEvent](tracing/02-trace_event.md)
+  * [Drgn](tracing/06-drgn.md)
 * [内核中的数据结构](data_struct/00-index.md)
   * [双链表](data_struct/01-list.md)
   * [优先级队列](data_struct/03-plist.md)
