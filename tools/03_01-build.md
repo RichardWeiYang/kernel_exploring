@@ -88,3 +88,93 @@ endif
 $make V=1
 gcc -D_GNU_SOURCE=     harness-selftest.c  -o /home/richard/git/linux/tools/testing/selftests/kselftest_harness/harness-selftest
 ```
+
+## 运行测试用例
+
+在测试用例目录下，如tools/testing/selftests/kselftest_harness，执行make run_tests就可以运行当前目录下的测试用例。
+
+这个目标在lib.mk中。
+
+```
+define RUN_TESTS
+	BASE_DIR="$(selfdir)";			\
+	. $(selfdir)/kselftest/runner.sh;	\
+	echo $(1);				\
+	if [ "X$(summary)" != "X" ]; then       \
+		per_test_logging=1;		\
+	fi;                                     \
+	run_many $(1)
+endef
+
+run_tests: all
+	@$(call RUN_TESTS, $(TEST_GEN_PROGS) $(TEST_CUSTOM_PROGS) $(TEST_PROGS))
+```
+
+当make run_tests执行后，就会运行call RUN_TESTS，而后面的变量都形成一个字符串作为第一个参数传给RUN_TESTS。
+
+最后运行在kselftest/runner.sh脚本中的run_many函数执行测试用例，参数也是那串字符串。
+
+```
+run_many()
+{
+	echo "TAP version 13"
+	DIR="${PWD#${BASE_DIR}/}"
+	test_num=0
+	total=$(echo "$@" | wc -w)
+	echo "1..$total"
+	for TEST in "$@"; do
+		BASENAME_TEST=$(basename $TEST)
+		test_num=$(( test_num + 1 ))
+		if [ -n "$per_test_logging" ]; then
+			logfile="/tmp/$BASENAME_TEST"
+			cat /dev/null > "$logfile"
+		fi
+		if [ -n "$RUN_IN_NETNS" ]; then
+			run_in_netns &
+		else
+			run_one "$DIR" "$TEST" "$test_num"
+		fi
+	done
+
+	wait
+}
+```
+
+传入的字符串参数，按照空格切分，有几个就表示有多少测试。然后针对每个测试运行run_one,其中会
+
+  * 读取测试配置文件settings
+  * 设置timeout
+  * 获取测试命令参数
+  * 拼接测试命令行 cmd
+  * 运行拼接好的命令行 cmd
+
+其中在执行最终命令时，用了一段有点复杂的脚本：
+
+```
+		((((( tap_timeout "$cmd" 2>&1; echo $? >&3) |
+			tap_prefix >&4) 3>&1) |
+			(read xs; exit $xs)) 4>>"$logfile" &&
+		echo "ok $test_num $TEST_HDR_MSG")
+```
+
+这里面可以分成几个部分来看
+
+```
+  ( tap_timeout "$cmd" 2>&1; echo $? >&3) 
+```
+
+执行$cmd，将错误输出合并到标准输出；然后把退出码写道文件描述符3。
+
+```((( ... ) | tap_prefix >&4) 3>&1)
+```
+
+将刚才命令的输出，通过tap_prefix格式化，再写到文件描述符4。
+然后把刚才写道文件描述符3的退出码再写回标准输出。
+
+```
+	((() | (read xs; exit $xs)) 4>>"$logfile" && echo "ok $test_num $TEST_HDR_MSG")
+```
+
+把写到标准输出的提出码读到变量xs，然后再退出。
+同时将刚才写到文件描述符4的命令运行输出内容，写道日志文件logfile。
+如果这一切都顺利，也就是exit $xs也是返回0（表示成功），则会提示测试成功 ok 。
