@@ -13,7 +13,7 @@ harness-selftest.c
 
 源文件的内容我们放到以后来分析，这里主要分析makefile的过程。
 
-# Makefile
+# kselftest_harness/Makefile
 
 打开这个makefile，发现内容非常少。但是最后又包含了lib.mk。所以重要的工作实际放在了这个库中。
 
@@ -178,3 +178,21 @@ run_many()
 把写到标准输出的提出码读到变量xs，然后再退出。
 同时将刚才写到文件描述符4的命令运行输出内容，写道日志文件logfile。
 如果这一切都顺利，也就是exit $xs也是返回0（表示成功），则会提示测试成功 ok 。
+
+# mm/Makefile
+
+对lib.mk有一定了解后，我们再来找一个例子，看看我们对构建的流程是否真的理解。也巩固一下学到的知识。
+
+文件以include ../lib.mk为界。
+
+前面定义了
+
+  * TEST_GEN_FILES: 这是最终要编译成可执行文件的测试目标
+  * TEST_PROGS: 这是make run_tests最后会执行的脚本
+
+之后定义了
+
+  * 目标文件的额外依赖： $(TEST_GEN_FILES): vm_util.c thp_settings.c
+  * 链接时额外库： $(OUTPUT)/migration: LDLIBS += -lnuma
+
+这么看，对selftest中构建过程已经有一定了解了。
