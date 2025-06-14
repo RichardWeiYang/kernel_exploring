@@ -132,6 +132,8 @@
 * [Tools](tools/handy_tools.md)
   * [发补丁](tools/01-patch.md)
   * [检查文件变化](tools/02-check_file_change.md)
+  * [selftest](tools/03-selftest.md)
+    * [构建过程](tools/03_01-build.md)
 * [Good To Read](reference/00-reference.md)
   * [内核自带文档](reference/03-kernel_doc.md)
   * [内存相关](reference/01-mm.md)

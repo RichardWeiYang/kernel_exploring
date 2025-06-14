@@ -4,5 +4,8 @@
 
 [检查文件变化][2]
 
+[selftest][3]
+
 [1]: /tools/01-patch.md
 [2]: /tools/02-check_file_change.md
+[3]: /tools/03-selftest.md
