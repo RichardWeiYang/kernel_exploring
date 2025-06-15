@@ -1,3 +1,18 @@
+kselftest的源代码在tools/testing/selftests目录下面，不同的测试大类按照目录区分。比如测试cgroup的就在cgroup目录下，测试mm的就在mm目录下。
+
+每个大类都可以单独构建，比如想要测试mm的内容，就可以直接进入到mm目录，运行make。
+
+```
+cd linux
+cd tools/testing/selftests
+cd mm
+make
+```
+
+下面我们按照自下而上的顺序，先了解如何构建独立的测试用例，再来看如何构建所有的测试用例。
+
+# kselftest_harness/Makefile
+
 我们看selftests中kselftest_harness这个目录下的测试用例，这个是自己测试自己的用例。
 
 文件不多，代码不长。用来学习selftest是很不错的入口。
@@ -12,8 +27,6 @@ harness-selftest.c
 也就是说新增一个测试用例，最少需要两个文件：一个源文件，一个makefile。
 
 源文件的内容我们放到以后来分析，这里主要分析makefile的过程。
-
-# kselftest_harness/Makefile
 
 打开这个makefile，发现内容非常少。但是最后又包含了lib.mk。所以重要的工作实际放在了这个库中。
 
@@ -196,3 +209,36 @@ run_many()
   * 链接时额外库： $(OUTPUT)/migration: LDLIBS += -lnuma
 
 这么看，对selftest中构建过程已经有一定了解了。
+
+# Makefile
+
+ok，上面我们了解了单独的一个测试用例是如何构建的，那现在来看看整个selftest的构建过程。这个就要分析tools/testing/selftests/Makefile文件了。
+
+```
+# 首先设置了目标，基本就是每个子目录作为一个目标
+TARGETS += ...
+
+
+# 如果在tools/testing/selftests目录下运行make，
+# 那么会用下面的方法设置内核源代码的具体对路径
+  BUILD := $(CURDIR)
+  abs_srctree := $(shell cd $(top_srcdir) && pwd)
+  KHDR_INCLUDES := -isystem ${abs_srctree}/usr/include
+  DEFAULT_INSTALL_HDR_PATH := 1
+
+
+all:
+	@ret=1;							\
+	for TARGET in $(TARGETS) $(INSTALL_DEP_TARGETS); do	\
+		BUILD_TARGET=$$BUILD/$$TARGET;			\
+		mkdir $$BUILD_TARGET  -p;			\
+		$(MAKE) OUTPUT=$$BUILD_TARGET -C $$TARGET	\
+				O=$(abs_objtree)		\
+				$(if $(FORCE_TARGETS),|| exit);	\
+		ret=$$((ret * $$?));				\
+	done; exit $$ret;
+```
+
+所以这么看，selftests根目录上的Makefile其实没有做什么事。就是设置好了TARGETS后，针对每个target运行make -C $TARGET。
+
+除了all这个目标，还有run_tests,hotpulg等其他目标。不过结构都差不多，就不展开了。
