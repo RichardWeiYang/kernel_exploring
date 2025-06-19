@@ -22,21 +22,21 @@
                    |                    |                      |     +----------+           |          |
                    |                    |                      |     |          |           |          |
                    |                    |                      |     |          |           |          |
-                   |                    |                      | pmd +----------+           |          |
-                   |                    |         pmd_offset() +---->| *pmd     |---------->+----------+
+                   |                    |                      |pmdp +----------+           |          |
+                   |                    |         pmd_offset() +---->| *pmdp    |---------->+----------+
                    |                    |                            +----------+
                    |                    |                            |          |
                    |                    |                            |          |
                    |                    |                            |          |
                    |                    |     +----------+           |          |
                    |                    |     |          |           |          |
-                   |                    | pud +----------+           |          |
-                   |       pud_offset() +---->| *pud     |---------->+----------+
+                   |                    |pudp +----------+           |          |
+                   |       pud_offset() +---->| *pudp    |---------->+----------+
                    |                          +----------+
                    |     +----------+         |          |
                    |     |          |         |          |
-                   | pgd +----------+         |          |
-pgd_offset(mm,addr)+---->| *pgd     |-------->+----------+
+                   |pgdp +----------+         |          |
+pgd_offset(mm,addr)+---->| *pgdp    |-------->+----------+
                          +----------+
                          |          |
                          |          |
@@ -83,15 +83,45 @@ pgd_offset(mm,addr)+---->| *pgd     |-------->+----------+
   * pmd
   * pte
 
-在操作对应层级时，也有对应的helper帮助我们获取对应的信息：
+在操作对应层级时，也有对应的helper帮助我们获取对应的信息。先按照功能我来分个类：
 
-  * xxx_index():    获取对应层级偏移量，用来计算下级页表地址
-  * xxx_offset():   在xxx_index()的基础上，取出下一级的页表entry内容
-  * xxx_alloc():    如果已经有页表，返回结果同xxx_offset()；否则分配xxx对应层级的页表
-  * xxx_none():     xxx对应这个entry是否为空，空说明需要分配下级页表了
-  * xxx_present():  xxx对应这个entry是否存在，其实是看下一层页表是否存在
-  * xxx_populate(): 安装页表，把下一层新分配的页表地址填到xxx表示的这一层
-  * xxx_install():  和xxx_populate()差不多，多了一个判断，最后调用xxx_populate()
+  * 遍历型：用于遍历页表
+  * 访问型：用于访问页表项内容
+  * 分配型：用于分配页表
+
+接下来就按照这几个大类来看看内核中常用的helper。 其中xxx代表了 pgd/pud/pmd/pte。
+
+遍历型：
+
+  * xxx_index(address):            获取对应层级偏移量，用来计算下级页表地址
+  * xxx_offset(xxx_t *, addr):     第一个参数指向的页表起始地址 + xxx_index()，也就是往下一层级页表走一层。比如pmd_offset()，传入参数是pud_t *，得到的是pmd_t *。
+  * pte_offset_map(pmd_t *, addr): 没有pte_offset(), 还有一个pte_offset_kernel(pmd_t *, addr)
+
+其中xxx_offset()值的注意的是，除了pgd_offset()，其余变体都是从上一层级的页表项中获取下一层级的页表虚拟地址，然后加上xxx_index()得到的。
+
+另外，从含义上来说pte_offset_kernel()和其他的xxx_offset是一样的。pte_offset_map()是在pte_offset_kernel()上又做了一些数据校验。
+
+访问型：
+
+  * xxxp_get(xxx_t *):           获得当前页表项(xxx_t *)的内容，读出指针指向的地址里的内容。用作下面一类helper的入参。
+  * xxx_val(xxx_t ):             获取xxx_t对应的值。注意这个和xxxp_get()的区别。xxx_val()才会真正去读出xxx_t这个类型中的值。
+  * xxx_flags(xxx_t ):           在xxx_val()的基础上，取出页表项相关的属性位
+  * xxx_none(xxx_t ):            判断xxx_t对应这个entry是否为空，空说明需要分配下级页表了
+  * xxx_present(xxx_t ):         判断xxx_t对应这个entry是否存在，其实是看下一层页表是否存在
+  * xxx_pfn(xxx_t ):             获取页表项指向的页的pfn，在xxx_val()基础上去掉不相关的bit，再右移PAGE_SHIFT
+  * xxx_page(xxx_t ):            获取页表项指向的页的page结构, 将xxx_pfn()转换为page struct
+  * pmd_page_vaddr(xxx_t ):      获取页表项指向的页的虚拟地址。PS:这个和获取xxx_page()的过程很像，前者是拿到pfn后转换为page struct，后者是将pfn转换为虚拟地址。
+  * xxx_pgtable(xxx_t ):         部分有定义，实际就是xxx_pfn()转换成虚拟地址，再做一个类型转换。
+
+其中只有xxxp_get()的入参是指针，其余都不是。通常理解xxxp_get()的返回值，会用作后续的入参。但实际使用中常常见到pgd_none(*pgd)这样的情况。
+
+其中pmd_pgtable()是个特例，在大多数平台下他默认定义为pmd_page()。平台可以在asm/pgtable.h中覆盖这个定义。难怪单独有一个pmd_page_vaddr的定义。
+
+分配型：
+
+  * xxx_alloc():                 如果已经有页表，返回结果同xxx_offset()；否则分配xxx对应层级的页表
+  * xxx_populate():              安装页表，把下一层新分配的页表地址填到xxx表示的这一层
+  * xxx_install():               和xxx_populate()差不多，多了一个判断，最后调用xxx_populate()
 
 # 页表的填写
 
