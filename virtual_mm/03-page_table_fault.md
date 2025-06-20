@@ -120,7 +120,7 @@ pgd_offset(mm,addr)+---->| *pgdp    |-------->+----------+
 分配型：
 
   * xxx_alloc():                 如果已经有页表，返回结果同xxx_offset()；否则分配xxx对应层级的页表
-  * xxx_populate():              安装页表，把下一层新分配的页表地址填到xxx表示的这一层
+  * xxx_populate():              安装页表，把下一层新分配的页表地址填到xxx表示的这一层。这是xxx_alloc()中的一部分
   * xxx_install():               和xxx_populate()差不多，多了一个判断，最后调用xxx_populate()
 
 # 页表的填写
