@@ -60,6 +60,40 @@ static __always_inline int PageTail(const struct page *page)
 
 虽然叫尾页，但实际上compound page里，除了头页其余的都是尾页，不仅仅是最后一个。
 
+## 是组合页
+
+PageCompound
+
+```
+static __always_inline int PageCompound(const struct page *page)
+{
+	return test_bit(PG_head, &page->flags) ||
+	       READ_ONCE(page->compound_head) & 1;
+}
+```
+
+这是上面两者的结合，是头页或者是尾页就会返回真。
+
+# 获取头页面
+
+因为重要的信息大多存储在头页面，或者是第二个页面。所以一个组合页找到它的头页面是经常需要的工作。
+
+```
+static __always_inline unsigned long _compound_head(const struct page *page)
+{
+	unsigned long head = READ_ONCE(page->compound_head);
+
+	if (unlikely(head & 1))
+		return head - 1;
+	return (unsigned long)page_fixed_fake_head(page);
+}
+
+#define compound_head(page)	((typeof(page))_compound_head(page))
+```
+
+其实就是从page->compound_head中取出来就好了。为什么要这么做，参考set_compound_head()。
+
+
 # 组合页的分配和释放
 
 设置组合页和清除组合页的方法为
