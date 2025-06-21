@@ -36,6 +36,7 @@
       * [寻找页结构体的位置](mm/03-sparsemem.md)
       * [眼花的页结构体](mm/10-page_struct.md)
         * [Compound Page](mm/page_allocator/01-compound_page.md)
+        * [Folio](mm/14-folio.md)
       * [Node-Zone-Page](mm/05-Node_Zone_Page.md)
       * [传说的伙伴系统](mm/06-page_alloc.md)
       * [GFP的功效](mm/12-gfp_usage.md)
