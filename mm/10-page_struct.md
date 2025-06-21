@@ -277,3 +277,33 @@ static __always_inline void ClearPage##uname(struct page *page)		\
 
 PS： 最终这些PAGEFLAG，都要被替换成FOLIO_FLAG。
 
+# PageType
+
+前面我们提到内核中SetPageXXX()的操作都是由一套宏定义操作page->flags实现的。
+
+现在发现还有一套非常类似的操作，__SetPageXXX()，是操作page->page_type实现的.
+
+```
+PAGE_TYPE_OPS()
+FOLIO_TYPE_OPS()
+```
+
+目前一共定义了这些type，以后看到PageXXX()这种宏定义，还记得看看是不是page_type。
+
+```
+enum pagetype {
+	/* 0x00-0x7f are positive numbers, ie mapcount */
+	/* Reserve 0x80-0xef for mapcount overflow. */
+	PGTY_buddy		= 0xf0,
+	PGTY_offline		= 0xf1,
+	PGTY_table		= 0xf2,
+	PGTY_guard		= 0xf3,
+	PGTY_hugetlb		= 0xf4,
+	PGTY_slab		= 0xf5,
+	PGTY_zsmalloc		= 0xf6,
+	PGTY_unaccepted		= 0xf7,
+	PGTY_large_kmalloc	= 0xf8,
+
+	PGTY_mapcount_underflow = 0xff
+};
+```
