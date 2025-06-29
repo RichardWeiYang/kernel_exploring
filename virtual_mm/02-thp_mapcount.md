@@ -213,7 +213,7 @@ page[0] +-----------------------+
         |_count                 |  = 2  -> 1      dec 1 for page[1]._count
         |_mapcount              |  = 0
 page[1] +-----------------------+
-        |_count                 |  = 3  -> 2      one for mapping, one for get_page()
+        |_count                 |  = 1  -> 2      one for mapping, one for get_page()
         |_mapcount              |  = -1 -> 0      set to page[0]._mapcount
         +-----------------------+
 
@@ -292,7 +292,7 @@ static inline void put_page(struct page *page)
 
 在这个提交中关键的是两点：
 
-    * compount_mapcount的引入
+    * compound_mapcount的引入
     * PageDoubleMap的引入
 
 然我们来看看[Transparent huge page reference counting][1]中是怎么对这两个新成员做介绍的：
@@ -557,7 +557,7 @@ page[0] +-----------------------+
 page[1] +-----------------------+
         |_count                 |  = 0   -> 3
         |_mapcount              |  = 2
-        |compound_mapcount      |  = 0
+        |compound_mapcount      |  = -1
         +-----------------------+
 
 Release the mapcount from each subpage from head->_count.
@@ -568,13 +568,13 @@ page[0] +-----------------------+
 page[1] +-----------------------+
         |_count                 |  = 3
         |_mapcount              |  = 2
-        |compound_mapcount      |  = 0
+        |compound_mapcount      |  = -1
         +-----------------------+
 ```
 
 # 第三个版本 -- 文件透明大页
 
-到上面的状态THP基本已经实现完了，出了文件透明大页。这部分的功能也是Kirill在2016年夏天实现的。
+到上面的状态THP基本已经实现完了，除了文件透明大页。这部分的功能也是Kirill在2016年夏天实现的。
 
 ```
 dd78fedde4b9 2016-07-26 rmap: support file thp
@@ -714,7 +714,7 @@ int __page_mapcount(struct page *page)
 
 这些变化的原因就是提交记录中描述的，PG_double_map没法作为映射计数的优化了。必须在每次映射时(page_add_file_rmap)增加每个PTE映射值。
 
-值得提的是total_mapcount和__page_mapcount的作用范围。
+值得一提的是total_mapcount和__page_mapcount的作用范围。
 
 之前看代码的时候一值困惑这两个函数的区别，想着既然有了前者为什么还要有后者，后来才明白了。
   * total_mapcount是要将一个页面当作大页来看待的
