@@ -722,5 +722,102 @@ int __page_mapcount(struct page *page)
 
 所以两者的实现会略有不同。
 
+# 后续变化
+
+记录一下近来的一些变化
+
+## total_compound_mapcount() -> folio_total_mapcount()
+
+```
+commit b14224fbea62e5bffd680613376fe1268f4103ba
+Author: Matthew Wilcox (Oracle) <willy@infradead.org>
+Date:   Wed Jan 11 14:28:50 2023 +0000
+
+    mm: convert total_compound_mapcount() to folio_total_mapcount()
+    
+    Instead of enforcing that the argument must be a head page by naming,
+    enforce it with the compiler by making it a folio.  Also rename the
+    counter in struct folio from _compound_mapcount to _entire_mapcount.
+```
+
+这个commit其实没有太多内容，只是把原来用page做参数的total_compound_mapcount()改成了用folio。
+
+我们来看一眼这个时候函数的样子。
+
+```
+int folio_total_mapcount(const struct folio *folio)
+{
+	int mapcount = folio_entire_mapcount(folio);
+	int nr_pages;
+	int i;
+
+	/* In the common case, avoid the loop when no pages mapped by PTE */
+	if (folio_nr_pages_mapped(folio) == 0)
+		return mapcount;
+	/*
+	 * Add all the PTE mappings of those pages mapped by PTE.
+	 * Limit the loop to folio_nr_pages_mapped()?
+	 * Perhaps: given all the raciness, that may be a good or a bad idea.
+	 */
+	nr_pages = folio_nr_pages(folio);
+	for (i = 0; i < nr_pages; i++)
+		mapcount += atomic_read(&folio_page(folio, i)->_mapcount);
+
+	/* But each of those _mapcounts was based on -1 */
+	mapcount += nr_pages;
+	return mapcount;
+}
+```
+
+这么写的原因是folio中有两个成员：
+
+  * _entire_mapcount: 作为整体印射数量
+  * _nr_pages_mapped: 作为PTE映射数量
+
+所以相当于有个小优化。
+
+## remove total_mapcount()
+
+```
+commit 5ce1f4844ba0def4b1b5526d8ccea27a98e840e5
+Author: David Hildenbrand <david@redhat.com>
+Date:   Mon Feb 26 15:13:24 2024 +0100
+
+    mm: remove total_mapcount()
+```
+
+之前使用的total_mapcount()的功能被folio_total_mapcount()取代。清理后total_mapcount()就退役了。
+
+## Remove folio_total_mapcount()
+
+```
+commit 05c5323b2a344c19c51cd1b91a4ab9ae90853794
+Author: David Hildenbrand <david@redhat.com>
+Date:   Tue Apr 9 21:22:47 2024 +0200
+
+    mm: track mapcount of large folios in single value
+```
+
+在folio中新增了_large_mapcount，这样把folio_total_mapcount()都干掉了。
+
+这么做后，事情就变得简单了。获取映射数目就统一用一个接口： ** folio_mapcount() **
+
+这个接口需要做的就是区分large page，如果是large page就直接调用folio_large_mapcount()。
+
+```
+static inline int folio_mapcount(const struct folio *folio)
+{
+        if (likely(!folio_test_large(folio)))
+                return atomic_read(&folio->_mapcount) + 1;
+        return folio_large_mapcount(folio);
+}
+```
+
+至此之后，看才我们看到的folio中的两个成员，将退居二线。
+
+  * _entire_mapcount: 作为整体印射数量
+  * _nr_pages_mapped: 作为PTE映射数量
+
+
 [1]: https://lwn.net/Articles/619738/
 [2]: /mm/06-page_alloc.md

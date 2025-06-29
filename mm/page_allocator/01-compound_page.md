@@ -111,8 +111,8 @@ get_page_from_freelist()
     prep_new_page(page, order, ...)                    // 开始准备page
         post_alloc_hook(page, order, gfp_flags);
         prep_compound_page(page, order);
-            __SetPageHead(page);                       // 设置PG_head
-            prep_compound_tail(page, i);               // 设置compound_head
+            __SetPageHead(page);                       // 设置PG_head, page[0]
+            prep_compound_tail(page, i);               // 设置compound_head, 所有tail pages
 	        p->mapping = TAIL_MAPPING
                 set_compound_head(p, head);
                 set_page_private(p, 0);
@@ -137,5 +137,6 @@ free_pages_prepare(page, order)
     free_tail_page_prepare(page, page + i)
         page->mapping = NULL;
         clear_compound_head(page)                      // 清除compound_head
-    page->flags &= ~PAGE_FLAGS_CHECK_AT_PREP;
+    free_page_is_bad(page + i)                         // 检验page是否有问题
+    (page + i)->flags &= ~PAGE_FLAGS_CHECK_AT_PREP;
 ```
