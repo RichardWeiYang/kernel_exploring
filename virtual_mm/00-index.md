@@ -14,6 +14,7 @@
   * 页表
   * vma
   * 反向映射
+  * mapcount
   * THP
 
 # 页表
@@ -38,9 +39,13 @@ PS: 在引入maple tree之前的[版本][10]
 
 了解了历史后，我们深入学习一下现状 [图解匿名反向映射][7]
 
+# mapcount
+
 看了上文后，大家一定对反向映射有了概念性的认识。但是你一定想不到在学习反向映射的过程中有一个非常繁琐的内容 -- mapcount。
 
 从概念上看这个值的含义是表示当前页映射到页表的个数，案例是比较好理解的。但是当这个数遇到了透明大页(THP)后就产生了各种纠缠不清的恩恩怨怨。在[THP和mapcount之间的恩恩怨怨][3]文章中，我将给大家尝试理清楚这中间的是是非非。
+
+最后我们尝试全面了解一下page结构中，跟踪作为进程内存被页表映射的各种情况[page mapcount][11]。
 
 # THP
 
@@ -66,3 +71,4 @@ PS: 在引入maple tree之前的[版本][10]
 [8]: /virtual_mm/07-mempolicy.md
 [9]: /virtual_mm/08-numa_balance.md
 [10]: /virtual_mm/deprecate-vma.md
+[11]: /virtual_mm/09-mapcount.md
