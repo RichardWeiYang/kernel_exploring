@@ -56,7 +56,7 @@
     * [页表和缺页中断](virtual_mm/03-page_table_fault.md)
     * [虚拟地址空间的管家--vma](virtual_mm/05-vma.md)
     * [匿名反向映射的前世今生](virtual_mm/01-anon_rmap_history.md)
-    * [图解匿名反向映射](virtual_mm/06-anon_rmap_usage.md)
+      * [图解匿名反向映射](virtual_mm/06-anon_rmap_usage.md)
     * [THP和mapcount之间的恩恩怨怨](virtual_mm/02-thp_mapcount.md)
     * [透明大页的玄机](virtual_mm/04-thp.md)
     * [NUMA策略](virtual_mm/07-mempolicy.md)
