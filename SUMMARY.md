@@ -130,6 +130,7 @@
   * [xarray](data_struct/04-xarray.md)
   * [B树](data_struct/05-btree.md)
   * [Maple Tree](data_struct/06-maple_tree.md)
+    * [Xarray vs Maple Tree](data_struct/08-xarray_vs_maple_tree.md)
   * [Interval Tree](data_struct/07-interval_tree.md)
 * [Tools](tools/handy_tools.md)
   * [发补丁](tools/01-patch.md)
