@@ -39,8 +39,18 @@ Maple Tree中的一个节点用maple_node表示，理解了其中时如何表达
  [min, P0]     [P0+1, P1]    [P1+1, max]
 ```
 
-每个节点包含了多个slot/pivot，其中pivot按照递增的顺序排列。
+每个节点包含了多个slot/pivot，且slot数量比pivot数量多1,其中pivot按照递增的顺序排列。
 当我们在一个坐标上依次标注pivot后，就展现出一段段由pivot分割的区域，而这些区域对应的值，则存储在相应的slot中。
+
+最后一个maple_node上的数据，就可以形成这么一个区间到数值的映射关系。
+
+```
+ [min, P0][P0+1, P1][P1+1, max]
+     |         |         |
+     v         v         v
+     S0        S1        S2
+
+```
 
 如果我们以slot为中心，每一个slot[n]代表的区域就是[P(n-1) + 1, Pn]。当然其中由两个特例，头和尾的slot由整个节点的min/max限制。
 
