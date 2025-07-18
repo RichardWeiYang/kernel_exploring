@@ -40,4 +40,21 @@ page中，在这里我们把相关的内容抽出来看，更清楚理解其中�
   +-----------------------------+-------------------------------+
 ```
 
+其中mapping表示映射到什么地方，分别有匿名映射和文件映射：
+
+```
+do_pte_missing()
+    do_anonymous_page()
+        folio_add_new_anon_rmap()
+            __folio_set_anon()
+                WRITE_ONCE(folio->mapping, anon_vma)
+    do_fault()
+        do_cow_fault()
+            vma->vm_ops->fault() -> filemap_fault()
+                __filemap_get_folio()
+                    filemap_add_folio()
+                        __filemap_add_folio()
+                            folio->mapping = mapping
+```
+
 [1]: /mm/10-page_struct.md
