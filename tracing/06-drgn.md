@@ -22,6 +22,15 @@ python3 -m drgn --help
 
 其中包括了自己编译的内核，和使用发行版自带的内核两种情况。
 
+# 内核调试helper
+
+为了方便调试内核，drgn项目已经给我们提供了不少helper来帮助我们。
+
+[Helpers][4]
+
+其中有专门一节是讲述内核数据结构相关的helper。
+
 [1]: https://drgn.readthedocs.io/en/latest/
 [2]: https://drgn.readthedocs.io/en/latest/installation.html
 [3]: https://drgn.readthedocs.io/en/latest/getting_debugging_symbols.html
+[4]: https://drgn.readthedocs.io/en/stable/helpers.html
