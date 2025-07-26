@@ -155,22 +155,24 @@ exc_page_fault
 
 ```
 handle_mm_fault(vma, address, flags, regs)
-    hugetlb_fault()                <--- hugetlb处理
-    __handle_mm_fault
-        // pud/pmd level
-        // pte level
-        handle_pte_fault           <--- 包括PTE这层页表，和做后的page
-            // empty pte
-            do_pte_missing
-                do_anonymous_page
-                do_fault
-            // other1
-            do_swap_page
-            do_numa_page
-            // other2
-            do_wp_page
-            pte_mkdirty
-            pte_mkyoung
+    if (is_vm_hugetlb_page(vma))
+        hugetlb_fault()                <--- hugetlb处理
+    else
+        __handle_mm_fault
+            // pud/pmd level
+            // pte level
+            handle_pte_fault           <--- 包括PTE这层页表，和做后的page
+                // empty pte
+                do_pte_missing
+                    do_anonymous_page
+                    do_fault
+                // other1
+                do_swap_page
+                do_numa_page
+                // other2
+                do_wp_page
+                pte_mkdirty
+                pte_mkyoung
 ```
 
 ## 匿名页填写
