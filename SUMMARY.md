@@ -60,6 +60,7 @@
     * [THP和mapcount之间的恩恩怨怨](virtual_mm/02-thp_mapcount.md)
       * [page mapcount](virtual_mm/09-mapcount.md)
     * [透明大页的玄机](virtual_mm/04-thp.md)
+      * [mTHP](virtual_mm/10-mTHP.md)
     * [NUMA策略](virtual_mm/07-mempolicy.md)
     * [numa balance](virtual_mm/08-numa_balance.md)
     * [老版vma](virtual_mm/deprecate-vma.md)
