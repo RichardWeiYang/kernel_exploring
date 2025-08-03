@@ -27,18 +27,25 @@ page中，在这里我们把相关的内容抽出来看，更清楚理解其中�
 ```
   folio
   page                          page_1
-  +-----------------------------+-------------------------------+
-  |flags                        |_flags_1(order)                |
-  |                             |_head_1(compound_head)         |
-  |                             |large_mapcount/_nr_pages_mapped|
-  |mapping                      |_entire_mapcount/_pin_count    |
-  |share                        |_mm_id_mapcount[2]             |
-  |private                      |_mm_ids                        |
-  |_mapcount                    |_mapcount_1                    |
-  |_refcount                    |_refcount_1                    |
-  |                             |_nr_pages                      |
-  +-----------------------------+-------------------------------+
+  +-----------------------------+--------------------------------+
+  |flags                        |_flags_1(order)                 |
+  |                             |_head_1(compound_head)          |
+  |                             |_large_mapcount/_nr_pages_mapped|
+  |mapping                      |_entire_mapcount/_pin_count     |
+  |share                        |_mm_id_mapcount[2]              |
+  |private                      |_mm_ids                         |
+  |_mapcount                    |_mapcount_1                     |
+  |_refcount                    |_refcount_1                     |
+  |                             |_nr_pages                       |
+  +-----------------------------+--------------------------------+
 ```
+
+其中：
+
+  * _mapcount:             单个page被映射的次数
+  * _large_mapcount:       整个folio被映射的次数（只有large folio有）
+  * _entire_mapcount:      整个folio被作为PMD/PUD整体映射的次数
+  * _nr_pages_mapped:      整个folio被映射的页数，一个页面最多被计数一次。外加ENTIRELY_MAPPED
 
 ## folio->mapping
 
