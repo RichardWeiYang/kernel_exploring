@@ -99,6 +99,11 @@ start_kernel()
 
         x86_init.paging.pagetable_init() -> paging_init()
             sparse_init()
+                memblock_presents()
+                    memory_present()                 // 分配mem_section，并标记present
+                sparse_init_nid()
+                    __populate_section_memmap()      // 拿到mmep，也就是当前section的struct page的内存
+                    sparse_init_early_section()      // 设置到mem_section->section_mem_map
             zone_size_init()
                 free_area_init()                     // 初始化pgdat
                     free_area_init_node()            // call for each pgdat
