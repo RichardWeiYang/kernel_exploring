@@ -29,7 +29,7 @@ Page结构体需要初始化后才能加入到buddy分配器供内核中各个�
                      free_area_init_core()
                          memmap_init() -> memmap_init_zone()
                              __init_single_page()             (2)
-     mm_core_init() -> mem_init()
+     mm_core_init()
          memblock_free_all()
              free_low_memory_core_early()
                  __free_memory_core() -> __free_pages_memory()

@@ -109,15 +109,19 @@ start_kernel()
                     free_area_init_node()            // call for each pgdat
                     node_set_state(nid, N_MEMORY)    // 存在可用内存的节点标上MEMORY
                     memmap_init()                    // 初始化page struct，__init_single_page()
+                        defer_init()                 // 对应的page延后初始化
     mm_core_init()
         build_all_zonelists(NULL)                    // 构造page allocator的zonelist
-        memblock_free_all()
+        memblock_free_all()                          // 将内存释放到buddy
             reset_all_zones_managed_pages()
             free_low_memory_core_early()
                 memmap_init_reserved_pages()         // 设置PageReserved
                     memblock_set_node()              // 全量设置memblock.reserved中的nid信息
                     reserve_bootmem_region()         // 初始化预留页的page（不受defer_init影响）
-                __free_memory_core()                 // release free pages to buddy
+                __free_memory_core(start, end)       // release free pages to buddy
+                    memblock_free_pages( , order)    //
+                        early_page_initialised(pfn)  // 如果设置了defer init，则会推迟释放
+                        __free_pages_core()          // 真释放
         mem_init()
         kmem_cache_init()                            // 可以用slab了
     rest_init()
