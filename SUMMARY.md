@@ -41,6 +41,7 @@
       * [传说的伙伴系统](mm/06-page_alloc.md)
       * [GFP的功效](mm/12-gfp_usage.md)
       * [页分配器的用户们](mm/11-users_of_buddy.md)
+      * [pageblock和migratetype](mm/15-pageblock_migratetype.md)
     * [slub分配器](mm/slub_allocator/00_slub.md)
       * [slub的理念](mm/08-slub_general.md)
       * [图解slub](mm/09-slub_in_graph.md)
