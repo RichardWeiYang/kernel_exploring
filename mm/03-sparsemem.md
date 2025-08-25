@@ -181,8 +181,8 @@ struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
      |   |                         |       = (1UL << (27 - 21))
      |   |                         |
      |   |                         |
-     |   |                         |    [(1UL << (PFN_SECTION_SHIFT - pageblock_order))]
-     |   |                         |    each 4bits represents a pageblock type
+     |   |                         |    [(1UL << (PFN_SECTION_SHIFT - pageblock_order))]个
+     |   |                         |    each 4/8bits represents a pageblock type
      |   |pageblock_flags[0]       |    get_pfnblock_flags_mask() / get_pfnblock_migratetype()
      |   |    (unsigned long)   ---|--->+----+----+----+---...---+----+----+
      +---+-------------------------+    |    |    |    |         |    |    |

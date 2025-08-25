@@ -102,14 +102,16 @@ start_kernel()
                 memblock_presents()
                     memory_present()                 // 分配mem_section，并标记present
                 sparse_init_nid()
+                    sparse_usage_init()              // 分配usage空间，包含subsection和pageblock
                     __populate_section_memmap()      // 拿到mmep，也就是当前section的struct page的内存
-                    sparse_init_early_section()      // 设置到mem_section->section_mem_map
+                    sparse_init_early_section()      // struct page设置到mem_section->section_mem_map，usage设置到usage(包括pageblock)
             zone_size_init()
                 free_area_init()                     // 初始化pgdat
                     free_area_init_node()            // call for each pgdat
                     node_set_state(nid, N_MEMORY)    // 存在可用内存的节点标上MEMORY
-                    memmap_init()                    // 初始化page struct，__init_single_page()
+                    memmap_init()->memmap_init_range // 初始化page struct，__init_single_page()
                         defer_init()                 // 对应的page延后初始化
+                        init_pageblock_migratetype() // 设置默认migratetype为MIGRATE_MOVABLE
     mm_core_init()
         build_all_zonelists(NULL)                    // 构造page allocator的zonelist
         memblock_free_all()                          // 将内存释放到buddy
