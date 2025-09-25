@@ -24,7 +24,7 @@
                    |                    |                      |     |          |           |          |
                    |                    |                      |pmdp +----------+           |          |
                    |                    |         pmd_offset() +---->| *pmdp    |---------->+----------+
-                   |                    |                            +----------+
+                   |                    |                            +----------+ pmd_page_vaddr(*pmdp)
                    |                    |                            |          |
                    |                    |                            |          |
                    |                    |                            |          |
@@ -32,7 +32,7 @@
                    |                    |     |          |           |          |
                    |                    |pudp +----------+           |          |
                    |       pud_offset() +---->| *pudp    |---------->+----------+
-                   |                          +----------+
+                   |                          +----------+ pud_pgtable(*pudp)
                    |     +----------+         |          |
                    |     |          |         |          |
                    |pgdp +----------+         |          |
@@ -122,6 +122,37 @@ pgd_offset(mm,addr)+---->| *pgdp    |-------->+----------+
   * xxx_alloc():                 如果已经有页表，返回结果同xxx_offset()；否则分配xxx对应层级的页表
   * xxx_populate():              安装页表，把下一层新分配的页表地址填到xxx表示的这一层。这是xxx_alloc()中的一部分
   * xxx_install():               和xxx_populate()差不多，多了一个判断，最后调用xxx_populate()
+
+## 图示
+
+个人觉得，内核中这些helper写得不是很统一，有些含义不是特别清楚，容易混淆。用图的形式可能更容易理解。
+
+```
+                            PMD
+   pud_pgtable(pudp) / ---->+------------------+<---- pmd_pgtable_page(pmdp)
+     pud_val(pud)        ^  |                  |         pmd_pgtable_page()返回的是pmdp
+                         |  |                  |              所在的PMD这个页的struct page
+                         |  |                  |
+        pmd_index(addr)  |  |                  |
+                         |  |                  |
+                         v  +------------------+                        PTE
+   pmdp                 --->|                  | pmd_page_vaddr(pmdp)-->+------------------+<--- pmd_page(pmd)
+    = pmd_offset(pudp, addr)+------------------+   pmd_val(pmd)      ^  |                  |        pmd_page()返回的是
+                            |                  |                     |  |                  |           pmdp中保存的页表的struct page
+                            +------------------+                     |  |                  |
+                                                    pte_index(addr)  |  |                  |
+   pud_pgtable() / pmd_offset() 返回的是虚拟地址                     |  |                  |
+   pud_val() 返回的是物理地址                                        v  +------------------+
+                                                 ptep                -->|                  |
+                                                  = pte_offset_kernel() +------------------+
+                                                                        |                  |
+                                                                        +------------------+
+
+                                                 pmd_page_vaddr() / pte_offset_kernel()
+                                                     返回的是虚拟地址
+                                                 pmd_val()返回的是物理地址
+
+```
 
 # 页表的填写
 
@@ -220,6 +251,43 @@ unmap_region
 其中unmap_vmas释放了真正对应的内存，而free_pgtables才释放页表。
 
 写到这里，感觉写完了，估计是很多细节自己还不知道。没事，留着以后有新发现再来挖掘。
+
+# 页表上的锁
+
+页表是一个公共资源，当发生缺页中断时大家可能同时访问页表并进行操作。
+
+最开始的时候，每个进程只有一把大锁，mm->page_table_lock。
+
+为了序列化对页表的访问，内核中提供了各种层次的锁来保护。 是的，就是我们在前面看到的页表层级，内核为不同的层级定义了不同的锁。
+
+  * pud_lockptr(mm, pudp)
+  * pmd_lockptr(mm, pmdp)
+  * pte_lockptr(mm, pmdp)
+  * ptep_lockptr(mm, ptep)
+
+目前pud_lockptr()是个冒牌货，因为还没有发现有扩展性的问题。
+
+其他的锁搜保存在特定的页表页中
+
+  * pmd_lockptr(): pmd_pgtable_page(pmd)
+  * pte_lockptr(): pmd_page(*pmdp)
+  * ptep_lockptr(): virt_to_page(ptep)
+
+
+直观一些，我慢来看看这几个锁在那里。
+
+```
+      PMD               +---pmd_lockptr()
+      +--------------+<-+                    /--pte_lockptr()
+      |              |        PTE           v   ptep_lockptr()
+      |              | -----> +--------------+
+      |              |        |              |
+      +--------------+        |              |
+                              |              |
+                              +--------------+
+```
+
+也就是pmd_lockptr()存放在PMD的页表里，而pte_lockptr()和ptep_lockptr()都在PTE页表里。
 
 # 参考文档
 
