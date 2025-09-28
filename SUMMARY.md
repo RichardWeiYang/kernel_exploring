@@ -67,6 +67,7 @@
       * [mTHP](virtual_mm/10-mTHP.md)
     * [NUMA策略](virtual_mm/07-mempolicy.md)
     * [numa balance](virtual_mm/08-numa_balance.md)
+    * [统计数据](virtual_mm/14-statistics.md)
     * [老版vma](virtual_mm/deprecate-vma.md)
   * [内存的回收再利用](mm_reclaim/00-index.md)
     * [水线](mm_reclaim/02-watermark.md)
