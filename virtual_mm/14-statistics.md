@@ -42,3 +42,36 @@ dec_mm_counter()
 ```
 
 增加匿名页计数，同时减少swap页计数。
+
+# vm_event_states
+
+## 位置
+
+这是一个全局的per_cpu数组。
+
+```
+struct vm_event_state {
+	unsigned long event[NR_VM_EVENT_ITEMS];
+};
+
+DECLARE_PER_CPU(struct vm_event_state, vm_event_states);
+```
+
+此外，这个还是一个内核配置项。只有配置了CONFIG_VM_EVENT_COUNTERS才会记录相关的事件信息。
+
+## 类型
+
+这个种类就多很多了， 详见vm_event_item，目测有120+种。
+
+## 操作
+
+因为是事件的计数，所以好像只有count_vm_event[s]()是常用的。
+
+## 观察 -- /proc/vmstat
+
+这个计数是可以观察的。也就是我们熟知的vmstat文件。不过vmstat文件中，不仅包含了vm_event_states的信息。
+
+```
+mm/vmstat.c:
+	proc_create_seq("vmstat", 0444, NULL, &vmstat_op);
+```
