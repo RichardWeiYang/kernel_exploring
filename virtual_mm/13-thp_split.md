@@ -68,3 +68,14 @@ PS: 也可以参考tools/testing/selftests/mm/split_huge_page_test.c中的使用
 也就是 pid, start_vaddr, end_vaddr, new_order
 
 可以看到，因为现在有mTHP了，所以拆分的时候可以指定拆分到的页面大小。当new_order省略时，默认位0。
+
+# deferred_split_shrinker
+
+系统运行时一般情况下我们不会去手动拆分大页，而是通过shrinker扫描将浪费的大页拆分 -- deferred_split_shrinker。
+
+shrinker的机制不在本章范围，简单来说函数do_shrink_slab()会在必要的时候调用count_objects/scan_objects。而deferred_split_shrinker的这两个成员是：
+
+  * deferred_split_count
+  * deferred_split_scan
+
+前者就是查看对应ds_queue->split_queuue_len，后者则需要执行关键的操作split_folio()。
