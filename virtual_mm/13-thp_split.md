@@ -47,3 +47,24 @@ __split_huge_pmd_locked
 
 对于PTE-mapped THP, __split_huge_pmd_locked函数不会被执行，因为页表早已拆分。此时try_to_unmap_one函数就担负起将PTE entry设置成migration entry的重任。接下来就和之前一样，由remap_page将migration entry恢复到页表中。
 
+# 手动拆分
+
+为了测试split的功能，内核还提供一个调试接口文件/sys/kernel/debug/split_huge_pages。按照格式写入该文件，则会触发对应页面的split。
+
+PS: 也可以参考tools/testing/selftests/mm/split_huge_page_test.c中的使用方法。
+
+## 使用方法
+
+这个文件在mm/huge_memory.c中创建的，只有写的接口，没有读的。对应的方法是split_huge_pages_write()。
+
+写这个文件分为两种格式： 文件和进程的。这次我们只看进程的。
+
+在split_huge_page_test.c中有定义这个格式：
+
+```
+#define PID_FMT "%d,0x%lx,0x%lx,%d"
+```
+
+也就是 pid, start_vaddr, end_vaddr, new_order
+
+可以看到，因为现在有mTHP了，所以拆分的时候可以指定拆分到的页面大小。当new_order省略时，默认位0。
