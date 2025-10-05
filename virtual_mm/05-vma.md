@@ -319,6 +319,8 @@ PS: 另外LWN也有关于[Per-VMA lock][2]的解释，以及[稳定下来][3]的
 以前的版本中，只有mmap_lock这个大锁，所有访问/修改地址空间的操作都要获取这一个大锁。这样就产生了瓶颈。
 现在引入一个顺序值，通过他减少在读地址空间时对大锁的竞争。
 
+## 读锁的流程
+
 先看下读的过程：
 
 ```
@@ -328,21 +330,52 @@ PS: 另外LWN也有关于[Per-VMA lock][2]的解释，以及[稳定下来][3]的
     up_read(vm_lock)
 ```
 
-再看下写的过程：
+## 写锁的流程
+
+我们来看看拿到mmap_lock写锁时，发生了什么。
+
+获取写锁mmap_lock
+
+```
+mmap_write_lock(mm)
+  down_write(&mm->mmap_lock)
+  mm_lock_seqcount_begin(mm)
+    mm->mm_lock_seq++
+```
+
+释放写锁mmap_lock
+
+```
+mmap_write_unlock(mm)
+  vma_end_write_all(mm);
+    mm->mm_lock_seq++
+  up_write(&mm->mmap_lock);
+```
+
+可以看出来，每次拿到/释放写锁mmap_lock，都会增加mm_lock_seq这个计数器。
+
+再看下怎么去拿per_vma_lock：
+
+PS:有意思的是vma_start_write前需要mmap_lock也是写锁状态。
 
 ```
 开始写：
+  vma_start_write(vma)
+    如果(vma->vm_lock_seq == mm->mm_lock_seq)，说明已经锁住了。返回
     down_write(vm_lock)
       vm_lock_seq <- mm_lock_seq
     up_write(vm_lock)
+
 结束写：
-    mm_lock_seq <- mm_lock_seq + 1
+  vma_end_write_all(vma)
+    mm->mm_lock_seq++
 ```
 
-这样，当访问vma时，我们就可以只锁vm_lock达到目的，减少了多mmap_lock的竞争。
+这样做的好处是，当我们要修改用户的内存空间映射时，我们获取写锁mmap_lock，并把对应的vma->vm_lock_seq增加。而page fault中只要判断对应的vma->vm_lock_seq是否和mm->mm_lock_seq相等来确定是否可以放访问。而减少了获取读锁mmap_lock的竞争。
 
 注意一个细节，读的保护范围是从读开始一直到读结束，而写的保护范围只是同步顺序值的时候。因为这里隐藏了每次写都要拿到mmap_lock的前提。
 恩，这个也是蛮有意思的。
+
 
 # vma对物理地址的影响
 
