@@ -1,3 +1,52 @@
+进入细节前，我们先来看看有哪几种情况会触发拆分。
+
+# 手动拆分
+
+为了测试split的功能，内核还提供一个调试接口文件/sys/kernel/debug/split_huge_pages。按照格式写入该文件，则会触发对应页面的split。
+
+PS: 也可以参考tools/testing/selftests/mm/split_huge_page_test.c中的使用方法。
+
+## 使用方法
+
+这个文件在mm/huge_memory.c中创建的，只有写的接口，没有读的。对应的方法是split_huge_pages_write()。
+
+写这个文件分为两种格式： 文件和进程的。这次我们只看进程的。
+
+在split_huge_page_test.c中有定义这个格式：
+
+```
+#define PID_FMT "%d,0x%lx,0x%lx,%d"
+```
+
+也就是 pid, start_vaddr, end_vaddr, new_order
+
+可以看到，因为现在有mTHP了，所以拆分的时候可以指定拆分到的页面大小。当new_order省略时，默认位0。
+
+# 自动拆分--deferred_split_shrinker
+
+系统运行时一般情况下我们不会去手动拆分大页，而是通过shrinker扫描将浪费的大页拆分 -- deferred_split_shrinker。
+
+shrinker的机制不在本章范围，简单来说函数do_shrink_slab()会在必要的时候调用count_objects/scan_objects。而deferred_split_shrinker的这两个成员是：
+
+  * deferred_split_count
+  * deferred_split_scan
+
+前者就是查看对应ds_queue->split_queuue_len，后者则需要执行关键的操作split_folio()。
+
+## 添加到deferred_list
+
+首先当分配pmd folio的时候，会调用deferred_split_folio()将folio添加到对应的deferred_list中。
+
+这样在deferred_split_scan的时候才会扫描到对应的folio，然后继续做拆分。
+
+## 判断是否需要拆分
+
+这个任务交给了thp_underused()，就是判断空闲的页面是否达到一定的数量。
+
+## 拆分
+
+最后重要的步骤就是拆分 -- split_folio()
+
 # 拆分页表
 
 现在的透明大页还支持拆分，这样可以在必要的时候退回到四级页表。
@@ -47,35 +96,3 @@ __split_huge_pmd_locked
 
 对于PTE-mapped THP, __split_huge_pmd_locked函数不会被执行，因为页表早已拆分。此时try_to_unmap_one函数就担负起将PTE entry设置成migration entry的重任。接下来就和之前一样，由remap_page将migration entry恢复到页表中。
 
-# 手动拆分
-
-为了测试split的功能，内核还提供一个调试接口文件/sys/kernel/debug/split_huge_pages。按照格式写入该文件，则会触发对应页面的split。
-
-PS: 也可以参考tools/testing/selftests/mm/split_huge_page_test.c中的使用方法。
-
-## 使用方法
-
-这个文件在mm/huge_memory.c中创建的，只有写的接口，没有读的。对应的方法是split_huge_pages_write()。
-
-写这个文件分为两种格式： 文件和进程的。这次我们只看进程的。
-
-在split_huge_page_test.c中有定义这个格式：
-
-```
-#define PID_FMT "%d,0x%lx,0x%lx,%d"
-```
-
-也就是 pid, start_vaddr, end_vaddr, new_order
-
-可以看到，因为现在有mTHP了，所以拆分的时候可以指定拆分到的页面大小。当new_order省略时，默认位0。
-
-# deferred_split_shrinker
-
-系统运行时一般情况下我们不会去手动拆分大页，而是通过shrinker扫描将浪费的大页拆分 -- deferred_split_shrinker。
-
-shrinker的机制不在本章范围，简单来说函数do_shrink_slab()会在必要的时候调用count_objects/scan_objects。而deferred_split_shrinker的这两个成员是：
-
-  * deferred_split_count
-  * deferred_split_scan
-
-前者就是查看对应ds_queue->split_queuue_len，后者则需要执行关键的操作split_folio()。
