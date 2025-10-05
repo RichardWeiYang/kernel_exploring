@@ -53,7 +53,12 @@ khugepaged的扫描可以分为两个级别
 
 # vma级扫描
 
-vma级扫描也是在函数khugepaged_scan_mm_slot()里，不过是在for_each_vma()这个循环中按照每2M的大小逐个扫描。其中又分了匿名页和文件页。这次我们只看匿名页 hpage_collapse_scan_pmd()。
+vma级扫描也是在函数khugepaged_scan_mm_slot()里，不过是在for_each_vma()这个循环中按照每2M的大小逐个扫描。
+
+
+# PMD级扫描
+
+最后就是按照PMD对齐进行扫描，其中又分了匿名页和文件页。这次我们只看匿名页 hpage_collapse_scan_pmd()。
 
 整个扫描过程就是对PMD这块区间的每个pte进行检查，对于不符合要求的就跳过。
 
