@@ -43,11 +43,46 @@ shrinker的机制不在本章范围，简单来说函数do_shrink_slab()会在�
 
 这个任务交给了thp_underused()，就是判断空闲的页面是否达到一定的数量。
 
+但是这只针对没有partially mapped的folio，如果是partially mapped的一定会拆分。
+
 ## 拆分
 
 最后重要的步骤就是拆分 -- split_folio()
 
-# 拆分页表
+不过最后看下来，核心的函数是__folio_split()。内核里这名字真的都是艺术。
+
+# 拆分的细节
+
+## __folio_split()碎碎念
+
+在阅读__folio_split()时，发现有几个有意思的点，在这里单独列出来算是一些知识点的补充。
+
+1. can_split_folio()
+
+   从这个函数可以看到folio_mapcount()和folio_ref_count()之间的关系。
+
+2. folio_try_get()和folio_ref_freeze()
+
+   我都一次知道freeze的意思是把refcount设置为0,这样其他人在folio_try_get()的时候就会失败。
+
+## 整体流程
+
+按照目前理解，整理一下__folio_split()的流程。
+
+```
+    folio_trylock(folio)
+    folio_try_get(folio)                     这两个是在进入__folio_split()前做的
+    
+    unmap_folio(folio)
+    folio_ref_freeze(folio, 1 + extra_pins)  正是因为unmap了，所以这个计数是这样
+    
+    __split_unmapped_folio()
+    folio_ref_unfreeze()                     unfreeze拆分后的所有folio
+    
+    remap_page()
+```
+
+## 拆分页表
 
 现在的透明大页还支持拆分，这样可以在必要的时候退回到四级页表。
 
@@ -67,7 +102,7 @@ __split_huge_pmd_locked
 
 当然我这个流程中只显示了匿名页的拆分过程，对于文件页还需要继续学习。
 
-# 拆分大页
+## 拆分大页
 
 拆分页表最终的目的也是为了拆分大页，这样在系统内存不够时可以回收大页中没有使用的部分。
 
