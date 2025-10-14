@@ -1,5 +1,7 @@
 当分配内存给进程使用，被映射到进程页表中时，内核会在page中记录page被映射的次数。也是因为有大页的存在，这个计数的过程变得有点复杂。
 
+David清理的[文章][2]
+
 # 计数都放在哪里
 
 既然是要计数，那就一定有记录的位置。本质上计数还是放在struct
@@ -102,4 +104,66 @@ do_pte_missing()
 
 * 另外值的注意的一点是hugetlb的rmap是在别的地方处理的。
 
+## __folio_add_rmap
+
+有必要展开看看这两个函数，距离上一次看明白大概过了两个月，现在又不明白了。
+
+首先看看不是large folio的情况。这个比较简单，直接增加_mapcount计数就行了。并且因为__mapcount从-1开始，所以如果增加后为0,则会变更folio stat。
+
+再看看large folio。这里又分两种情况： PTE map 和 非PTE map。
+
+### PTE map
+
+这里我们只看!CONFIG_NO_PAGE_MAPCOUNT的情况。
+
+  * 增加所有page的_mapcount计数
+  * 增加folio->_large_mapcount计数
+  * 增加folio->_nr_pages_mapped计数
+  * 调整folio stats
+
+其中第一点比较好理解，第二点其实也还行，不过增加的数量是page数量而不是folio的数量(因为这里是作为单个page映射的)。比较绕的是第三、四点。
+
+我们对照这代码来看看。
+
+```
+	atomic_t *mapped = &folio->_nr_pages_mapped;
+
+		do {
+			first += atomic_inc_and_test(&page->_mapcount);
+		} while (page++, --nr_pages > 0);
+
+		if (first &&
+		    atomic_add_return_relaxed(first, mapped) < ENTIRELY_MAPPED)
+			nr = first;
+
+	__folio_mod_stat(folio, nr, nr_pmdmapped);
+```
+
+首先遍历folio中的page，增加page->_mapcount。不过这里的重点是看看其中多少是第一次被映射的。
+如果有第一次被映射的，然后才会去考虑调整folio->_nr_pages_mapped。因为这个值表示的是folio中有多少页被映射过，每个页面只计数一次。
+
+第四点和非PTE map相关，也就是为了简化_nr_pages_mapped表达，其中做了一个边界值ENTIRELY_MAPPED。如果已经设置过这个值了，说明folio被整体映射过，那也就不需要调整统计值了。
+
+当然也可以不这么做，每次都检查一下folio->_entire_mapcount。但是这么做会多计算。
+
+### 非PTE map
+
+我们同样只看!CONFIG_NO_PAGE_MAPCOUNT的情况。
+
+  * 增加folio->_entire_mapcount
+  * folio->_nr_pages_mapped计数 + ENTIRELY_MAPPED
+  * 调整folio stats
+
+这里1、3比较清楚，2需要解释一下。
+
+因为在调整统计值的时候，我们调整的是有多少新增页被映射。虽然我们映射了一整个folio，但是为了这个目的，我们要知道之前已经映射了多少。而这个值要通过folio->_nr_pages_mapped取低位来得到。
+
+## __folio_remove_rmap
+
+这个过程就是__folio_add_rmap()反过来。值得一提的是partially_mapped的判定。
+
+当CONFIG_NO_PAGE_MAPCOUNT时，这个判断是精准的。而不是的时候，这个判断是一个概率值。因为folio->_large_mapcount在PTE level，每个page都会映射。
+所以如果多个page被重复映射，这个值即便是大于folio_large_nr_pages()也可能是partially_mapped。
+
 [1]: /mm/10-page_struct.md
+[2]: https://lwn.net/Articles/974223/
