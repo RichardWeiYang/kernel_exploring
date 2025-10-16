@@ -165,5 +165,25 @@ do_pte_missing()
 当CONFIG_NO_PAGE_MAPCOUNT时，这个判断是精准的。而不是的时候，这个判断是一个概率值。因为folio->_large_mapcount在PTE level，每个page都会映射。
 所以如果多个page被重复映射，这个值即便是大于folio_large_nr_pages()也可能是partially_mapped。
 
+# maybe mapped shared
+
+后来内核中又发展出来一个尝试简化判断页面是否只被一个进程映射的方法(exclusive)。
+
+这个系列有点多，重要的是这个改动。
+
+```
+commit 6af8cb80d3a9a6bbd521d8a7c949b4eafb7dba5d
+Author: David Hildenbrand <david@redhat.com>
+Date:   Mon Mar 3 17:30:05 2025 +0100
+
+    mm/rmap: basic MM owner tracking for large folios (!hugetlb)
+```
+
+其中最关键的改动在函数folio_add_return_large_mapcount()/folio_sub_return_large_mapcount()。
+
+而最后想要达到的目标是在folio_maybe_mapped_shared()，通过test_bit(FOLIO_MM_IDS_SHARED_BITNUM, &folio->_mm_ids)来判断有没有可能是被shared mapped。
+
+当然这个只是**可能**，也就是如果这个bit设置，那么可能是共享映射。但是如果这个bit没有设置，那么肯定是独享映射。
+
 [1]: /mm/10-page_struct.md
 [2]: https://lwn.net/Articles/974223/
