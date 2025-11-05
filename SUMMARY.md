@@ -144,6 +144,8 @@
   * [selftest](tools/03-selftest.md)
     * [构建过程](tools/03_01-build.md)
     * [编写测试](tools/03_02-write_test.md)
+* [Real Case](real_case/00-index.md)
+  * [Dead lock](real_case/01-dead_lock.md)
 * [Good To Read](reference/00-reference.md)
   * [内核自带文档](reference/03-kernel_doc.md)
   * [内存相关](reference/01-mm.md)
