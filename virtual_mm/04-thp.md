@@ -2,6 +2,8 @@
 
 之前我对这个东西也不是很理解，而且还经常和另一个概念混淆--hugetlb。这两个都是利用了页表中“大页”表项，减少tlb的失误进而提高内存访问速度。而两者不同的是，相对hugetlb， THP更加灵活，当然也更加复杂。
 
+系统中如何使用，可以参考官方[文档][4]。
+
 # 相同之处
 
 THP和hugetlb相同之处，或者说和其他虚拟内存的相同之处在于在缺页中断中的处理流程几乎是一样的。
@@ -32,3 +34,4 @@ handle_mm_fault()
 [1]: /virtual_mm/12-thp_alloc.md
 [2]: /virtual_mm/11-khugepaged.md
 [3]: /virtual_mm/13-thp_split.md
+[4]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/admin-guide/mm/transhuge.rst
