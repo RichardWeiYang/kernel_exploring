@@ -11,6 +11,35 @@ handle_mm_fault()
 
 如果/sys/kernel/mm/transparent_hugepage/有全局配置，或者vma中标识了使用VM_HUGEPAGE。在发生缺页中断时，则会分配大页。
 
+# 大页分配行为的控制
+
+在[官方文档][1]中提到，有两组系统设置控制大页的分配：
+
+  * enabled
+  * defrag
+
+## enabled
+
+自从mTHP使用后，配置上出现了两个层级。
+
+  * /sys/kernel/mm/transparent_hugepage/enabled
+  * /sys/kernel/mm/transparent_hugepage/hugepages-<size>kB/enabled
+
+其中第一个文件中支持的配置是： always, madvise, never。
+而第二个文件中支持的配置多了一个： inherit。
+
+## defrag
+
+而defrag的选项则比较多，这个主要是用来设置在大页分配时没有足够内存情况下的动作。
+
+```
+	echo always >/sys/kernel/mm/transparent_hugepage/defrag
+	echo defer >/sys/kernel/mm/transparent_hugepage/defrag
+	echo defer+madvise >/sys/kernel/mm/transparent_hugepage/defrag
+	echo madvise >/sys/kernel/mm/transparent_hugepage/defrag
+	echo never >/sys/kernel/mm/transparent_hugepage/defrag
+```
+
 # 预留页表
 
 在创建大页表项的时候，与其他人不同，还预留了一张页表。分别对应两个函数。
@@ -24,3 +53,4 @@ handle_mm_fault()
 
 不得不说这是一个有意思的设计。
 
+[1]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/admin-guide/mm/transhuge.rst
