@@ -82,6 +82,10 @@ shrinker的机制不在本章范围，简单来说函数do_shrink_slab()会在�
     remap_page()
 ```
 
+## __split_unmapped_folio()
+
+真正拆分的活落在了这个函数上。
+
 ## 拆分页表
 
 现在的透明大页还支持拆分，这样可以在必要的时候退回到四级页表。
