@@ -65,6 +65,7 @@
       * [合并-khugepaged](virtual_mm/11-khugepaged.md)
       * [拆分](virtual_mm/13-thp_split.md)
       * [mTHP](virtual_mm/10-mTHP.md)
+      * [透明大页mapcount和refcount](virtual_mm/15-thp_mapcount_refcount.md)
     * [NUMA策略](virtual_mm/07-mempolicy.md)
     * [numa balance](virtual_mm/08-numa_balance.md)
     * [统计数据](virtual_mm/14-statistics.md)
