@@ -36,3 +36,16 @@ shmem_alloc		    swpin
 具体含义可以在Documentation/admin-guide/mm/transhuge.rst文档中查看。
 
 不过在/proc/vmstat中也有一些和thp相关的计数。都是以thp_开头的。也可以在transhuge.rst文档中查看。
+
+# 分配过程
+
+目前mTHP分配发生在缺页中断中：
+
+```
+handle_pte_fault()
+    do_pte_missing()
+        do_anonymous_page()
+            alloc_anon_folio()                                         // 去判断是否有合适的mTHP满足
+            folio_ref_add(folio, nr_pages - 1)                         // 计数设置为nr_pages
+            folio_add_new_anon_rmap(folio, vma, addr, RMAP_EXCLUSIVE)  // 调整mapcount
+```
