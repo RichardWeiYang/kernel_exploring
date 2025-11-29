@@ -9,28 +9,7 @@
 
 不论是匿名页还是文件页，都是通过mmap映射到进程空间，然后在访问时触发缺页中断。所以缺页中断的行为，在mmap时就已经定好了。
 
-下面列出关心的内容：
-
-```
-__mmap_region(file, )
-    call_mmap_prepare()
-    __mmap_new_vma()
-        __mmap_new_file_vma()
-            vma->vm_file = get_file(file)
-        vma_link_file()                           // 把vma加到file->f_mapping
-    set_vma_user_defined_fields()
-        vma->vm_ops = map->vm_ops;
-```
-
-这里主要设置了vma的两个成员：
-
-  * vm_file
-  * vm_ops
-
-对应到文件系统上，我们举个例子：
-
-  * vm_file->f_op:  就是ext4_file_operations
-  * vm_ops:         就是ext4_file_vm_ops
+这部分内容在[私有和共享映射][1]有较为详细的描述。
 
 # 缺页中断
 
@@ -46,3 +25,5 @@ do_read_fault()
 ```
 
 ## filemap_fault
+
+[1]: /virtual_mm/17-map_private_shared.md
