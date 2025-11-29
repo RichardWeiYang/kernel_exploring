@@ -57,6 +57,7 @@
     * [页表和缺页中断](virtual_mm/03-page_table_fault.md)
       * [文件缺页中断](virtual_mm/16-filemap_fault.md)
     * [虚拟地址空间的管家--vma](virtual_mm/05-vma.md)
+      * [私有和共享映射](virtual_mm/17-map_private_shared.md)
     * [匿名反向映射的前世今生](virtual_mm/01-anon_rmap_history.md)
       * [图解匿名反向映射](virtual_mm/06-anon_rmap_usage.md)
     * [THP和mapcount之间的恩恩怨怨](virtual_mm/02-thp_mapcount.md)
