@@ -89,4 +89,6 @@ __mmap_region(file, )
   * vm_file->f_op:  就是ext4_file_operations
   * vm_ops:         就是ext4_file_vm_ops
 
-好了，到这里其实并没有区分文件映射是共享还是私有的。我觉得这个问题要等到缺页中断的时候再处理。
+好了，到这里其实并没有区分文件映射是共享还是私有的。我觉得这个问题要等到[缺页中断][1]的时候再处理。
+
+[1]: /virtual_mm/16-pf_anon_file.md
