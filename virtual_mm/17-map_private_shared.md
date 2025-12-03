@@ -7,7 +7,7 @@
 
 所以，对于一个vma空间，它要么是私有映射，要么是共享映射。
 
-好了，我这感觉是说了依据废话。但是，看了这么多年的内核代码，我现在才发现这个里面藏着一个玄机。因为映射的类型决定了最后页面的类型是匿名页还是文件页。而不是根据MAP_ANONYMOUS来判断的。
+好了，我这感觉是说了一句废话。但是，看了这么多年的内核代码，我现在才发现这个里面藏着一个玄机。因为映射的类型决定了最后页面的类型是匿名页还是文件页，而不是仅仅根据MAP_ANONYMOUS来判断的。或者应该说决定背后页面映射的关键是MAP_SHARED和MAP_PRIVATE。
 
   * MAP_SHARED: 背后用的是文件页
   * MAP_PRIVATE: 背后用的是匿名页
@@ -19,10 +19,10 @@
 PS： 这一点我们可以通过/proc/self/pagemap读取对应地址的内存属性来验证。
 
 
-那接下来的问题是 vma_is_anonymous() 下的内存，都是匿名页么？
+那接下来的问题是vma_is_anonymous()这个判断究竟是什么意思呢？符合这个判断的vma映射的都是匿名页么？
 
 
-# vma_is_anonymous()
+# vma_is_anonymous()究竟判断了什么
 
 曾经一直一位匿名映射的区域，对应的内存一定是匿名的。现在看来这是个错误的理解。现在来看看这个判断到底是什么意思。
 
@@ -33,7 +33,7 @@ static inline bool vma_is_anonymous(struct vm_area_struct *vma)
 }
 ```
 
-这么看就清楚了，凡是没有vm_ops的，就是匿名映射。那我们来看看mmap的时候是怎么处理的吧。
+这么看就清楚了，凡是没有vm_ops的，才是匿名映射。那我们来看看mmap时，各种情况下vm_ops究竟设置成了什么。
 
 首先在vm_flags上，对共享映射都加上了VM_SHARED | VM_MAYSHARE标识。
 
@@ -49,19 +49,25 @@ static inline bool vma_is_anonymous(struct vm_area_struct *vma)
 因为设置了VM_SHARED标识，所以会调用shmem_zero_setup()来设置vma。
 
 ```
-    vma->vm_file = file;
-    vma->vm_ops = &shmem_anon_vm_ops;
+__mmap_new_vma
+    shmem_zero_setup
+        vma->vm_file = file;
+        vma->vm_ops = &shmem_anon_vm_ops;
 ```
 
-最终内核会给共享匿名映射分配一个shmem文件和操作函数集shmem_anon_vm_ops。
+最终内核会给共享匿名映射分配一个shmem文件和操作函数集shmem_anon_vm_ops。这样，后续的操作就和文件保持一致了。
 
-这样，后续的操作就和文件保持一致了。
-
-那这样的话，vma_is_anonymous()对于共享匿名映射，返回的是假。也就是不认为这是一个匿名映射。
+这样的话，vma_is_anonymous()对于共享匿名映射返回的是假。也就是不认为这是一个匿名映射。
 
 ## anon private
 
 新分配的vma会被设置为vma_set_anonymous()，也就是将vm_ops设置为空。
+
+```
+__mmap_new_vma
+    vma_set_anonymous()
+        vma->vm_ops = NULL
+```
 
 ## file shared/private
 
