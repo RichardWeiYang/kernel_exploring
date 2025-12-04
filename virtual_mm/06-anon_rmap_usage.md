@@ -404,12 +404,13 @@ try_to_unmap(folio, flags)
     rmap_walk_anon(folio, rwc, true/false)
         anon_vma = page_anon_vma(page), get anon_vma from page->mapping
         pgoff_start = page_to_pgoff(folio);
+            return folio->index;
         pgoff_end = pgoff_start + folio_nr_pages(folio) - 1;
 
         // 在interval tree中找pgoff_start/pgoff_end之间的avc
         anon_vma_interval_tree_foreach(avc, &anon_vma->rb_root, pgoff_start, pgoff_end)
 	    // 先确定在进程中的虚拟地址
-	    address = vma_address(vma, ...)
+	    address = vma_address(vma, pgoff_start, nr_pages)
             // 接下来就是 try_to_unmap_one() 来干活了
             rwc->rmap_one(page, vma, address, rwc->arg) -> try_to_unmap_one()
             // 通过folio_not_mapped()判断是否还有用户台映射
@@ -421,3 +422,45 @@ try_to_unmap(folio, flags)
 
 不过这里值的注意的是，anon_vma这棵树上的vma中有可能对应的page已经发生了cow而不是原有的链接上来的了。所以在try_to_unmap_one()中，还要确定folio目前是不是还在当前vma。这个检查的过程在page_vma_mapped_walk()中完成。
 
+## vma_address()
+
+在上面的try_to_unmap()中，我们看到确定地址的函数是vma_address().这个地址是用来后续在进程地址空间查找对应的PTE的。
+
+我们来看看这个值是怎么计算出来的。
+
+```
+static inline unsigned long vma_address(const struct vm_area_struct *vma,
+		pgoff_t pgoff, unsigned long nr_pages)
+{
+	unsigned long address;
+
+	if (pgoff >= vma->vm_pgoff) {
+		address = vma->vm_start +
+			((pgoff - vma->vm_pgoff) << PAGE_SHIFT);
+		/* Check for address beyond vma (or wrapped through 0?) */
+		if (address < vma->vm_start || address >= vma->vm_end)
+			address = -EFAULT;
+	} else if (pgoff + nr_pages - 1 >= vma->vm_pgoff) {
+		/* Test above avoids possibility of wrap to 0 on 32-bit */
+		address = vma->vm_start;
+	} else {
+		address = -EFAULT;
+	}
+	return address;
+}
+```
+
+首先看其中的参数pgoff，这个参数是通过folio_pgoff()计算得来的，其实就是folio->index。
+
+那现在需要研究一下这个folio->index是什么。
+
+这里先看匿名页。在发生缺页中断，要把页面填好之前，会分配页并且设置为匿名页。这里有个函数__folio_set_anon()。
+
+```
+__folio_set_anon
+    folio->index = linear_page_index(vma, address)
+        pgoff = (address - vma->vm_start) >> PAGE_SHIFT;
+        pgoff += vma->vm_pgoff;
+```
+
+这么看就清楚了，原来存的是在vma->vm_pgoff上的一个偏移，现在要得到虚拟地址，那就是在vma->vm_start上加上这个偏移就行。
