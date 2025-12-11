@@ -92,6 +92,7 @@
     * [全局观测](mm/statistics/01-global.md)
       * [kpageflags](mm/statistics/03-kpageflags.md)
     * [进程观测](mm/statistics/02-per_process.md)
+      * [pagemap](mm/statistics/04-pagemap.md)
 * [中断和异常](interrupt_exception/00-start_from_hardware.md)
   * [从IDT开始](interrupt_exception/01-idt.md)
   * [中断？异常？有什么区别](interrupt_exception/02-difference.md)
