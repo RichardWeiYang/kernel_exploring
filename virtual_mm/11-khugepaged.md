@@ -99,3 +99,13 @@ vma级扫描也是在函数collapse_scan_mm_slot()里，不过是在for_each_vma
   * copy: __collapse_huge_page_copy()
 
 先把swapout的页面拿进来，然后隔离，最后把内容拷贝到新分配的大页。如果成功了，将原先的页面释放，否则恢复原先页面。
+
+# 测试
+
+针对大页合并，内核中提供了一个用户态的测试程序。
+
+tools/testing/selftests/mm/khugepaged.c
+
+这算是[selftests][1]的一个例子。
+
+[1]: /mm/tests/01_functional_test.md
