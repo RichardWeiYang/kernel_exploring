@@ -120,3 +120,12 @@ __split_huge_pmd_locked
 
 但是如果这里就把pte都映射好了，那为什么还要在remap_page()呢？
 
+# 测试
+
+针对大页拆分，内核中提供了一个用户态的测试程序。
+
+tools/testing/selftests/mm/split_huge_page_test.c
+
+这算是[selftests][1]的一个例子。
+
+[1]: /mm/tests/01_functional_test.md
