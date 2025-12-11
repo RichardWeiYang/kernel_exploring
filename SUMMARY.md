@@ -88,6 +88,10 @@
   * 测试
     * [功能测试](mm/tests/01_functional_test.md)
     * [性能测试](mm/tests/02_performance_test.md)
+  * [观测数据](mm/statistics/00-index.md)
+    * [全局观测](mm/statistics/01-global.md)
+      * [kpageflags](mm/statistics/03-kpageflags.md)
+    * [进程观测](mm/statistics/02-per_process.md)
 * [中断和异常](interrupt_exception/00-start_from_hardware.md)
   * [从IDT开始](interrupt_exception/01-idt.md)
   * [中断？异常？有什么区别](interrupt_exception/02-difference.md)
