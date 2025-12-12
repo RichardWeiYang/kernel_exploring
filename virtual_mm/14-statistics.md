@@ -24,13 +24,15 @@ enum {
 
 对操作的方法是
 
-```
-add_mm_counter()
-inc_mm_counter()
-dec_mm_counter()
+修改类:
 
-get_mm_counter_sum()
-```
+  * add_mm_counter()
+  * inc_mm_counter()
+  * dec_mm_counter()
+
+读取类:
+
+  * get_mm_counter_sum()
 
 这个看上去是统计进程中各种类型内存的数量，以base page为单位。
 
@@ -51,7 +53,7 @@ get_mm_counter_sum()
 
 其中的RssAnon, RssFile, RssShmem和VmSwap。
 
-# vm_event_states
+# vm_event_state
 
 ## 位置
 
@@ -83,5 +85,94 @@ DECLARE_PER_CPU(struct vm_event_state, vm_event_states);
 mm/vmstat.c:
 	proc_create_seq("vmstat", 0444, NULL, &vmstat_op);
 ```
+
+# pgdat->vm_stat[]/vm_node_stat[]
+
+## 位置
+
+看了下，发现一个有意思的东四，有两个一模一样的统计数组。
+
+  * pgdat->vm_stat[]
+  * vm_node_stat[]
+
+两个都是原子变量，只不过一个在pgdat中，一个是全局的。
+
+```
+atomic_long_t vm_node_stat[NR_VM_NODE_STAT_ITEMS] __cacheline_aligned_in_smp;
+```
+
+所以可以看到，最核心的变量更新函数 node_page_state_add()是对这两个变量同时更新的。
+
+```
+static inline void node_page_state_add(long x, struct pglist_data *pgdat,
+				 enum node_stat_item item)
+{
+	atomic_long_add(x, &pgdat->vm_stat[item]);
+	atomic_long_add(x, &vm_node_stat[item]);
+}
+```
+
+而且这个XXX_add()名字好迷惑，实际上只要传入的参数是负数，就是减法操作。
+
+## 类型
+
+一个枚举型数组，里面约有四十左右类型。
+
+包括了active_anon, active_file等。
+
+## 操作
+
+目前看到操作这个数组的方式，除了直接通过原子操作atomic_long_read()之外，有下面几个封装。
+
+修改类:
+
+  - 以pgdate为参数,最核心的API，其余都是调用这个
+      - node_page_state_add(pgdat, )
+      - __inc_node_state(pgdat, )
+      - __dec_node_state(pgdat, )
+      - __mod_node_page_state(pgdat, )
+      - mod_node_page_state(pgdat, ), 可能依赖mod_node_state()
+  - 以page为参数
+      - __inc_node_page_state(page, )
+      - inc_node_page_state(page, )
+      - __dec_node_page_state(page, )
+      - dec_node_page_state(page, )
+  - 以folio为参数
+      - __node_stat_mod_folio(folio, )
+      - node_stat_mod_folio(folio, )
+      - __node_stat_add_folio(folio, )
+      - node_stat_add_folio(folio, )
+      - __node_stat_sub_folio(folio, )
+      - node_stat_sub_folio(folio, )
+      - __folio_mod_stat(folio, )
+
+大致看了下，有下划线前缀的是不关中断的版本。偷懒的讲，不确定的时候就有没有下划线的版本比较保险。
+
+基本上以page为参数的API应该是要退出历史舞台了，取而代之的是以folio为参数的。
+
+但是统计数据中有些是和内存页无关的，比如PGPROMOTE_CANDIDATE，就还是用以pgdat为参数的API。
+
+读取类:
+
+  * global_node_page_state()
+  * global_node_page_state_pages()
+
+## 展示
+
+# vm_zone_stat[]
+
+## 位置
+
+这是一个全局原子变量
+
+```
+atomic_long_t vm_zone_stat[NR_VM_ZONE_STAT_ITEMS] __cacheline_aligned_in_smp;
+```
+
+## 类型
+
+## 操作
+
+## 展示
 
 [1]: /mm/statistics/06-status.md
