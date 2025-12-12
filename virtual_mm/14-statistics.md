@@ -28,6 +28,8 @@ enum {
 add_mm_counter()
 inc_mm_counter()
 dec_mm_counter()
+
+get_mm_counter_sum()
 ```
 
 这个看上去是统计进程中各种类型内存的数量，以base page为单位。
@@ -42,6 +44,12 @@ dec_mm_counter()
 ```
 
 增加匿名页计数，同时减少swap页计数。
+
+## 展示
+
+这里统计的值会在文件[/proc/self/status][1]中展示。
+
+其中的RssAnon, RssFile, RssShmem和VmSwap。
 
 # vm_event_states
 
@@ -75,3 +83,5 @@ DECLARE_PER_CPU(struct vm_event_state, vm_event_states);
 mm/vmstat.c:
 	proc_create_seq("vmstat", 0444, NULL, &vmstat_op);
 ```
+
+[1]: /mm/statistics/06-status.md

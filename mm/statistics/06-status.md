@@ -1,8 +1,10 @@
-这个文件展示的是整个进程的状态，其中有部分是和内存相关的。
+/proc/pid/status这个文件展示的是整个进程的状态，其中有部分是和内存相关的。
 
 # 代码
 
-相关代码在fs/proc/base.c的proc_pid_status中。
+展示相关代码在fs/proc/base.c的proc_pid_status中。
+
+而统计的代码可以看[统计数据][1]中mm->rss_stat[]部分。
 
 # 格式
 
@@ -73,3 +75,5 @@ x86_Thread_features_locked:
 这是整个输出，其中Vm开头的是和内存相关的。
 
 # 使用
+
+[1]: /virtual_mm/14-statistics.md
