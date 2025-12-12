@@ -157,7 +157,11 @@ static inline void node_page_state_add(long x, struct pglist_data *pgdat,
   * global_node_page_state()
   * global_node_page_state_pages()
 
+这两个蛮奇怪的，global_node_page_state()调用的是global_node_page_state_pages()。而前者会在某条件下warn一次。
+
 ## 展示
+
+在[/proc/meminfo][2]中会读取global_node_page_state()来返回当前系统相关信息。
 
 # vm_zone_stat[]
 
@@ -176,3 +180,4 @@ atomic_long_t vm_zone_stat[NR_VM_ZONE_STAT_ITEMS] __cacheline_aligned_in_smp;
 ## 展示
 
 [1]: /mm/statistics/06-status.md
+[2]: /mm/statistics/07-meminfo.md

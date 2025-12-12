@@ -4,6 +4,8 @@
 
 内核中fs/proc/meminfo.c是用来创建这个文件的代码。其中主要也就是meminfo_proc_show这个函数。
 
+以及相关数据采集的函数可以参考[vm_stat][1]
+
 # 格式
 
 ```
@@ -68,3 +70,5 @@ DirectMap2M:    11354112 kB
 但是AnonPages > Active(anon) + Inactive(anon)我不太理解。就算不一样，也应该是小于才对吧？
 
 # 使用
+
+[1]: /virtual_mm/14-statistics.md
