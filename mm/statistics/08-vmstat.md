@@ -208,4 +208,13 @@ nr_unstable 0
 
 # 使用
 
+从展示的信息数量上看，/proc/vmstat比/proc/meminfo输出的内容更多，而且更原始。
+
+而meminfo中也有vmstat所没有的信息。
+
+比如meminfo中有MemAvailable，这个不是简单的nr_free_pages。而是经过一个计算加上了可以回收的部分。
+另外meminfo中还有SwapTotal/SwapFree这种总的大小，在vmstat中也没有。
+
+所以meminfo也不能完全被vmstat取代。
+
 [1]: /virtual_mm/14-statistics.md
