@@ -163,21 +163,56 @@ static inline void node_page_state_add(long x, struct pglist_data *pgdat,
 
 在[/proc/meminfo][2]中会读取global_node_page_state()来返回当前系统相关信息。
 
-# vm_zone_stat[]
+# zone->vm_stat[]/vm_zone_stat[]
 
 ## 位置
 
-这是一个全局原子变量
+和vm_node_stat[]一样，有两个一模一样的数组：一个是全局原子变量，一个是在zone里的变量
 
 ```
 atomic_long_t vm_zone_stat[NR_VM_ZONE_STAT_ITEMS] __cacheline_aligned_in_smp;
 ```
 
+修改的时候，两者会同时修改。
+
 ## 类型
+
+一个枚举型数组，里面约有四十左右类型。
 
 ## 操作
 
+修改类:
+
+  - 以zone为参数
+      - zone_page_state_add(zone, x)
+      - __inc_zone_state(zone, )
+      - __dec_zone_state(zone, )
+      - mod_zone_page_state(), 可能依赖mod_zone_state(zone, )
+  - 以page为参数
+      - __inc_zone_page_state(page, )
+      - inc_zone_page_state(page, )
+      - __dec_zone_page_state(page, )
+      - dec_zone_page_state(page, )
+  - 以folio为参数
+      - __zone_stat_mod_folio(folio, )
+      - zone_stat_mod_folio(folio, )
+      - __zone_stat_add_folio(folio, )
+      - zone_stat_add_folio(folio, )
+      - __zone_stat_sub_folio(folio, )
+      - zone_stat_sub_folio(folio, )
+
+有意思的是，folio的这些api中，目前只用了zone_stat_mod_folio()。
+
+而page的api，目前也只有zsmalloc在用了。
+
+读取类:
+
+  * global_zone_page_state()
+
 ## 展示
+
+在[/proc/vmstat][3]中会读取global_zone_page_state()来返回当前系统相关信息。
 
 [1]: /mm/statistics/06-status.md
 [2]: /mm/statistics/07-meminfo.md
+[3]: /mm/statistics/08-vmstat.md
