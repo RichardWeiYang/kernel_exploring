@@ -75,16 +75,24 @@ DECLARE_PER_CPU(struct vm_event_state, vm_event_states);
 
 ## 操作
 
-因为是事件的计数，所以好像只有count_vm_event[s]()是常用的。
+这个事件计数的操作比较简单：
 
-## 观察 -- /proc/vmstat
+变更：
 
-这个计数是可以观察的。也就是我们熟知的vmstat文件。不过vmstat文件中，不仅包含了vm_event_states的信息。
+  - _count_vm_event()
+  - count_vm_event()
+  - _count_vm_events()
+  - count_vm_events()
 
-```
-mm/vmstat.c:
-	proc_create_seq("vmstat", 0444, NULL, &vmstat_op);
-```
+读取：
+
+  - all_vm_enents()
+
+## 观察
+
+这个计数是可以观察的，也就是在我们熟知的[vmstat][3]文件。
+
+不过vmstat文件中，不仅包含了vm_event_states的信息。所以事件记录是从pgpgin字段开始的。
 
 # pgdat->vm_stat[]/vm_node_stat[]
 
