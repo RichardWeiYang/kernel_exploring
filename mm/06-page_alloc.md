@@ -1,5 +1,7 @@
 memblock作为系统启动初期的内存管理系统，在系统启动后就显得不是那么灵活了。在这个时候，内核就提出了页分配器来管理物理内存。而我们在Node->Zone->Page这篇中看到的这个层次结构，就是为了页分配器做的准备。
 
+PS: Matthew 提出了[简化page]的想法[8]
+
 # 页从哪来
 
 一路走来，我们回顾一下内存信息是怎么收集上来的
@@ -498,3 +500,4 @@ check_new_page()
 [5]: /mm_reclaim/02-watermark.md
 [6]: /virtual_mm/07-mempolicy.md
 [7]: /mm/12-gfp_usage.md
+[8]: https://kernelnewbies.org/MatthewWilcox/Memdescs/Path
