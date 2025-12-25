@@ -6,48 +6,77 @@
 
 
 ```
-!sub_make_done
+this-makefile := $(lastword $(MAKEFILE_LIST))
+abs_srctree := $(realpath $(dir $(this-makefile)))
+abs_output := $(CURDIR)
+
+sub_make_done != 1     // 第一次一定会被执行，用来设置参数
     设置了一些参数，如：
     KBUILD_EXTMOD := $(M)  真正干活的时候，会以这个作区分，执行的操作不一样
-    sub_make_done := 1
+    abs_output如果用户指定输出目录，会变化。影响到下面的need_sub_make。
+    export sub_make_done := 1
 end
 
-need_sub_make
-    某些情况下会重新执行一下make
-    make -C dir -f Makefile $(MAKECMDGOALS)
-end
+// 根据目标输出目录是否是当前目录，判断是否要嵌套执行
+ifneq ($(abs_output),$(CURDIR))
+need-sub-make := 1
+endif
 
-设置下面几个参数，决定这次构建的方式
-config-build :=
-single-build :=
-mixed-build  :=
-
-mixed-build
-    对$(MAKECMDGOALS)中的目标，依次执行make -f Makefile $$i
+need-sub-make == 1
+        // 如果目标输出目录核当前目录不一样，就重新执行一次make
+        $(Q)$(MAKE) $(no-print-directory) -C $(abs_output) \
+        -f $(abs_srctree)/Makefile $(MAKECMDGOALS)
 else
-    到这里才开始真正干活
 
-    kbuild核心文件
-    include scripts/Kbuild.include
+        // 接下来判断是不是要逐个make
 
-    config-build
-        构建配置，如make menuconfig
-    else
-        读取配置，看上去和.config一样
-        include include/config/auto.conf
+        设置下面几个参数，决定这次构建的方式
+        config-build     :=
+        mixed-build      :=
+        need-config      := 1
+        may-sync-config  := 1
+        single-build     :=
 
-        !KBUILD_EXTMOD
-            build-dir := .
+        // 根据MAKECMDGOALS来判断是否需要设置上面的值，来决定接下来做什么共作
+        mixed-build == 1
+            对$(MAKECMDGOALS)中的目标，依次执行
+            make -f $(srctree)Makefile $$i
         else
-            build-dir := $(KBUILD_EXTMOD)
+            // 到这里才开始真正干活
+
+            包含kbuild核心文件，其中定义了build := -f $(srctree)/scripts/Makefile.build obj
+            include scripts/Kbuild.include
+
+            // out of tree规则
+            ifdef building_out_of_srctree
+            endif
+
+            // 目标是不是config文件
+            config-build
+                构建配置，如make menuconfig
+            else
+                // 读取配置，看上去和.config一样
+                include include/config/auto.conf
+
+                // 如果需要.config但是没有，报错
+
+                // 根据配置include需要的Makefile
+
+                // 先是内核的规则，后是模块的规则
+                if !KBUILD_EXTMOD
+                    build-dir := .
+                else
+                endif
+
+                // 如果有single target, 如.o, mm/等
+                if single-build
+                endif
+
+                $(build-dir): prepare
+                	$(Q)$(MAKE) $(build)=$@ need-builtin=1 need-modorder=1 $(single-goals)
+            end
         end
-
-        PHONY += $(build-dir)
-        $(build-dir): prepare
-        	$(Q)$(MAKE) $(build)=$@ need-builtin=1 need-modorder=1 $(single-goals)
-
-    end
-end
+end  # need-sub-make
 ```
 
 我把根Makefile的骨架子，通过注释的方式列了出来。感觉终于对根Makefile有了点了解。
@@ -71,6 +100,126 @@ kbuild涉及的文件较多，还有条件判断，这样导致目标的依赖�
 可以打印出目标是modules时所有的变量和规则定义。
 
 不过这个输出还是有点大的。。。
+
+## 获取当前目录
+
+内核在编译时会包含多个makefile，所以根Makefile通过MAKEFILE_LIST来获取当前执行时的目录。
+
+```
+this-makefile := $(lastword $(MAKEFILE_LIST))
+abs_srctree := $(realpath $(dir $(this-makefile)))
+abs_output := $(CURDIR)
+```
+
+MAKEFILE_LIST保存了读取的所有makefile，最后一个是当前的。通过这种方式来得到当前真实目录。
+
+## sub_make判断是否要重新调用一次
+
+这是根Makefile的第一部分，其中我们又可以分成两部分：
+
+  * sub_make_done
+  * need-sub-make
+
+主要是解决嵌套执行的。
+
+变量sub_make_done控制了一些变量只要设置一次。设置完后，sub_make_done会设置为1并export，表示以后不会再被运行。
+
+这部分设置的变量比如有：
+
+  * quiet/Q/KBUILD_VERBOSE: 用来控制编译时输出是否简化
+  * KBUILD_EXTMOD: 是否用了make M=dir，将dir设置到变量KBUILD_EXTMOD，并export
+  * output/abs_output: 编译结果存放的目录/绝对目录，默认是执行make的当前目录
+
+设置完后，根据abs_output和CURDIR的值是否相等设置need-sub-make。如果不相等说明需要嵌套执行make，会重新调用一遍make。如果相等，那接下来才是正经的make工作。
+
+在研究真正的工作前，我们看看sub_make是怎么做的。
+
+```
+        $(Q)$(MAKE) $(no-print-directory) -C $(abs_output) \
+        -f $(abs_srctree)/Makefile $(MAKECMDGOALS)
+```
+
+其中：
+
+  * -C 表示先进入到对应的目录，再执行make，而且CURDIR被设置为该目录，而不是执行make时的目录
+  * -f 使用哪个makefile，这个会出现在MAKEFILE_LIST中
+
+这时我们再来看Makefile开头的变量定义：
+
+```
+this-makefile := $(lastword $(MAKEFILE_LIST))
+abs_srctree := $(realpath $(dir $(this-makefile)))
+abs_output := $(CURDIR)
+```
+
+结合上面的命令行我们可以得到：
+
+  * 源代码目录由-f传入的Makefile指定
+  * 输出结果目录由-C传入的目录指定
+
+当然对输出结果的目录还有一个小插曲，就是可以通过-O选项来指定输出目录。好在这一切都发生在sub_make前，也就是当我们执行这个嵌套make的时候已经决定好了。
+
+### 几个用到的变量
+
+在sub make阶段，以及刚开始处理的时候，由几个很相似的变量让我困惑。
+
+  * abs_srctree: 这个变量只有在最开头的时候设置过，后面不再变化。它被设置为Makefile所在的目录，一般就是内核源码的根目录
+  * abs_output: 这个变量含义时编译输出结果保存到哪个目录。实际上经过sub make后，就一直是CURDIR，也不会再变了
+  * srcroot: 如果有M选项，就是这个模块的目录；如果没有就是内核根目录
+  * srctree: 如果有M选项，就是内核根目录；如果没有就是srcroot(也是内核根目录？)
+
+## single-build
+
+如果命令行中指定了单个要编译的目标，如 xxx.o，那么规则就会走到这里，由这里来处理。
+
+这部分由下面代码来检测：
+
+```
+single-targets := %.a %.i %.ko %.lds %.ll %.lst %.mod %.o %.rsi %.s %/
+...
+ifneq ($(filter $(single-targets), $(MAKECMDGOALS)),)
+    single-build := 1
+    ...
+endif
+```
+
+所以当我们编译单个目标时，就到这里来看规则。值的注意的是make mm/也算是单个目标。
+
+但是这里出现了一个神奇的地方。
+
+```
+$(single-no-ko): $(build-dir)
+	@:
+```
+
+这个是一个空规则。。。。所以到底是怎么编译这个单个目标的呢？ 玄机隐藏再build-dir中。
+
+```
+$(build-dir): prepare
+	$(Q)$(MAKE) $(build)=$@ need-builtin=1 need-modorder=1 $(single-goals)
+```
+
+在Makefile中有一个针对build-dir的规则，实际上的单个目标是通过这条命令编译的。比如我们要编译mm/mmu_gather.o，展开后是这样。
+
+```
+make -f ./scripts/Makefile.build obj=. need-builtin=1 need-modorder=1 ./mm/mmu_gather.o
+```
+
+但是这还不是最后，进去后在Makefile.build里有single-subdir-goals
+
+```
+$(single-subdir-goals): $(single-subdirs)
+	@:
+```
+
+最后真正编译的规则是这条
+
+```
+# Built-in and composite module parts
+$(obj)/%.o: $(obj)/%.c $(recordmcount_source) FORCE
+	$(call if_changed_rule,cc_o_c)
+	$(call cmd,force_checksrc)
+```
 
 # kbuild
 
@@ -103,7 +252,7 @@ src := $(obj)
 默认目标
 $(obj)/:
 
-include include/config/auto.conf
+-include include/config/auto.conf
 
 include scripts/Kbuild.include
     设置kbuild-file变量，接下来将被引用。 srctree在根Makefile中定义
