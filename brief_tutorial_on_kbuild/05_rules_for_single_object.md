@@ -3,35 +3,38 @@
 比如我们拿这个文件来做例子：
 
 ```
-make mm/memblock.o
+make mm/mmu_gather.o
 ```
 
-# 找到我们的目标
+# single-build -- 第一个规则
 
-有了刚才的经验，这次我们顺着之前的思路。先到根目录的Makefile中找找线索。有时候找代码除了经验，还得有点运气。不知道你这次有没有找到呢？
-
-单个文件的目标还是在根目录Makefile文件中。
+在[kbuild系统浅析][4]中single-build部分，我们知道如果编译目标是单个的obj文件，采用的规则是single-no-ko.
 
 ```
-%.o: %.c prepare scripts FORCE
-	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
+$(single-no-ko): $(build-dir)
+	@:
 ```
 
-你看，这格式其实和我们平时自己写的规则是差不多的。.o的文件依赖于同名的.c文件，然后执行了一个命令来生成。不过呢，确实还多了些东西，包括一些特殊的依赖条件，以及这个命令长得也有点丑。
-
-俗话说的好，恶人自有恶人磨，长得丑的代码也有丑办法来解读。
-
-把上面这段代码添加一个井号
+可以看到，这个规则实际没有具体命令，而是根据依赖build-dir来生成。
 
 ```
-%.o: %.c prepare scripts FORCE
-	#$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
+build-dir	:= .
+
+$(build-dir): prepare
+	$(Q)$(MAKE) $(build)=$@ need-builtin=1 need-modorder=1 $(single-goals)
+```
+
+看上去也不复杂，但是不知道具体是什么样子。我们在上面的代码上加一个#，来看看具体命令是什么。
+
+```
+$(build-dir): prepare
+	#$(Q)$(MAKE) $(build)=$@ need-builtin=1 need-modorder=1 $(single-goals)
 ```
 
 再运行一次
 
 ```
-$ make mm/memblock.o
+$ make mm/mmu_gather.o
   CHK     include/config/kernel.release
   CHK     include/generated/uapi/linux/version.h
   CHK     include/generated/utsrelease.h
@@ -39,59 +42,22 @@ $ make mm/memblock.o
   CHK     include/generated/bounds.h
   CHK     include/generated/asm-offsets.h
   CALL    scripts/checksyscalls.sh
-# @make -f ./scripts/Makefile.build obj=mm mm/memblock.o
+#@make -f ./scripts/Makefile.build obj=. need-builtin=1 need-modorder=1 ./mm/mmu_gather.o
 ```
 
-怎么样，通过显示实际执行的命令，是不是你感觉熟悉了些？从显示出的命令来看，生成mm/memblock.o这个目标文件是重新又调用了一次make，而这次使用的是script/Makefile.build这个规则文件，传入的参数是obj=mm，目标还是mm/memblock.o。
+怎么样，通过显示实际执行的命令，是不是你感觉熟悉了些？从显示出的命令来看，生成mm/mmu_gather.o这个目标文件是重新又调用了一次make，而这次使用的是script/Makefile.build这个规则文件，传入的参数是obj=.，目标还是mm/mmu_gather.o。
 
 你看，是不是又清晰了一些？
 
-# 展开那串命令行
+## 展开那串命令行
 
-现在我们来看那串命令行究竟是如何展开的。
-
-```
-    $(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
-```
-
-第一招，我们先来拆分。这条命令中出现了好几个变量，Q, MAKE, build, build-dir, target-dir。前面两个就是定义成@和make的，基本问题不大也比较好理解。关键是后面三个。
-
-## build-dir 和 target-dir
-
-可巧，最后两个变量的定义就在这组规则的上方。我们拿来先看一下。
+刚才我们偷懒，直接打印出执行的命令。现在我们来看那串命令行究竟是如何展开的。
 
 ```
-# Single targets
-# ------------------------------------------------------------
-# Single targets are compatible with:
-# - build with mixed source and output
-# - build with separate output dir 'make O=...'
-# - external modules
-#
-#  target-dir => where to store outputfile
-#  build-dir  => directory in kernel source tree to use
-
-ifeq ($(KBUILD_EXTMOD),)
-        build-dir  = $(patsubst %/,%,$(dir $@))
-        target-dir = $(dir $@)
-else
-        zap-slash=$(filter-out .,$(patsubst %/,%,$(dir $@)))
-        build-dir  = $(KBUILD_EXTMOD)$(if $(zap-slash),/$(zap-slash))
-        target-dir = $(if $(KBUILD_EXTMOD),$(dir $<),$(dir $@))
-endif
+	$(Q)$(MAKE) $(build)=$@ need-builtin=1 need-modorder=1 $(single-goals)
 ```
 
-看注释，这两个变量一个是做编译的路径，一个是目标存放的路径。
-
-定义本身分为两种情况
-* 当KBUILD_EXTMOD为空，表示不是编译内核模块
-* 当KBUILD_EXTMOD不为空，表示是在编译内核模块
-
-这次我们并没有编译内核模块，所以采用的是第一种情况的定义。从显示出的命令来看build-dir和target-dir分别定义为mm和mm/。说明指向的路径是一样的，只是相差了最后的一个/。
-
-## build
-
-五个变量基本理解了四个，那现在来看看最后一个build。
+第一招，我们先来拆分。这条命令中出现了好几个变量，Q, MAKE, build, single-goals。single-goals好理解就是我们的mm/mmu_gather.o。那实际上就剩这个build了。
 
 通过我们比较丑的方法得到最后展开的命令来看，这个build变量包含的是
 
@@ -109,24 +75,148 @@ build := -f $(srctree)/scripts/Makefile.build obj
 
 瞧，是不是和我们估计得长得差不多。
 
-# 再进一步
+# single-target -- 第二个规则
 
-终于把第一步的命令看明白了，现在是时候研究规则文件scripts/Makefile.build是如何编译出mm/memblock.o的了。
+终于把第一步的命令看明白了，现在是时候研究规则文件scripts/Makefile.build是如何编译出mm/mmu_gather.o的了。
 
-按照同样的方法在scripts/Makefile.build文件中找.o的目标。找啊找啊找，终于看到一条像的了。
+```
+@make -f ./scripts/Makefile.build obj=. need-builtin=1 need-modorder=1 ./mm/mmu_gather.o
+```
+
+也就是这么一个命令是怎么工作的。作为唯一的makefile，那就只能从Makefile.build入手了。
+
+按照同样的方法在scripts/Makefile.build文件中找关键的部分：
+
+```
+# Single targets
+# ---------------------------------------------------------------------------
+
+single-subdirs := $(foreach d, $(subdir-ym), $(if $(filter $d/%, $(MAKECMDGOALS)), $d))
+single-subdir-goals := $(filter $(addsuffix /%, $(single-subdirs)), $(MAKECMDGOALS))
+
+$(single-subdir-goals): $(single-subdirs)
+	@:
+```
+
+## subdir-ym的来历
+
+要理解上面这段规则，就要从subdir-ym说起。
+
+```
+# Subdirectories we need to descend into
+subdir-ym := $(sort $(subdir-y) $(subdir-m) \
+			$(patsubst %/,%, $(filter %/, $(obj-y) $(obj-m))))
+```
+
+subdir-ym的定义是所有subdir-y, subdir-m和obj-y,obj-m中的目录部分。而且把后缀/去掉了。
+
+那这些变量是哪里定义的呢？这就牵扯到了scripts/Makefile.build中的include $(kbuild-file)。但这个kbuild-file又是谁？这个又是在scripts/Kbuild.include中定义的。
+
+```
+###
+# The path to Kbuild or Makefile. Kbuild has precedence over Makefile.
+kbuild-file = $(or $(wildcard $(src)/Kbuild),$(src)/Makefile)
+```
+
+也就是make执行时对应的$(src)/Kbuild或者$(src)/Makefile文件。
+
+值的注意的是，这里的路径$(src)是在Makefile.build开头定义的$(srcroot)/$(obj)。srcroot一般是内核根目录(参考[kbuild系统浅析][4])，obj我们传入的是"."。所以这里找到的就是根目录下的Kbuild文件。在这个文件的最后可以看到遗传obj-y/obj-m的定义。也就是可能依赖的所有子目录了。
+
+绕了这么一大圈，我自己都已经晕了，让我们总结一下。
+
+```
+scripts/Makefile.build
+-----------------------------------------
+src := $(srcroot)/$(obj)                                          // 定义目录src
+
+include $(srctree)/scripts/Kbuild.include
+    kbuild-file = $(or $(wildcard $(src)/Kbuild),$(src)/Makefile) // 设置需要包含的Kbuild文件，在src目录下
+
+include $(kbuild-file)                                            // 包含Kbuild文件，其中定义了obj-y/obj-m
+
+subdir-ym := $(sort $(subdir-y) $(subdir-m) \                     // subdir-ym定义为obj-y/obj-m的集合，去掉/
+		$(patsubst %/,%, $(filter %/, $(obj-y) $(obj-m))))
+
+ifneq ($(obj),.)
+subdir-ym	:= $(addprefix $(obj)/, $(subdir-ym))             // 下沉到子目录后，加上目录前缀，用于匹配目标
+endif
+```
+
+现在再回过来看这两个变量的定义。
+
+  * single-subdirs筛选出MAKECMDGOALS中目录和subdir-ym中匹配的目录
+  * single-subdir-goals筛选出MAKECMDGOALS中带目录，且后面跟文件的目标
+
+所以匹配完之后，我们看到这么一条规则
+
+```
+mm/mmu_gather.o: mm
+	@:
+```
+
+ok，这就是我们期待的规则。慢着，这规则是啥？
+
+# Descend -- 第三个规则
+
+到这里又要开始找了，上面的规则断了线。还好，上面规则中还有一个依赖，mm。我们从这里再往下看看。
+
+Makefile.build中有这么一个规则：
+
+```
+# Descending
+# ---------------------------------------------------------------------------
+
+PHONY += $(subdir-ym)
+$(subdir-ym):
+	$(Q)$(MAKE) $(build)=$@ \
+	need-builtin=$(if $(filter $@/built-in.a, $(subdir-builtin)),1) \
+	need-modorder=$(if $(filter $@/modules.order, $(subdir-modorder)),1) \
+	$(filter $@/%, $(single-subdir-goals))
+```
+
+其中subdir-ym正好包含了我们的依赖mm。老办法，加上#看看效果。
+
+我们得到了真正执行的命令：
+
+```
+make -f ./scripts/Makefile.build obj=mm \
+need-builtin=1 \
+need-modorder=1 \
+mm/mmu_gather.o
+```
+
+难怪，subdir-ym加入了PHONY，所以虽然没有mm这个实际的目标，但是每次都会执行。
+
+通过注释调这个规则，mmu_gather.o再也没有编译出来过。说明找对了。
+
+## Descend递归
+
+我们现在研究的目标是mm/mmu_gather.o，那如果是mm/kfence/core.o呢？这里，开发者充分使用了递归的思想。
+
+如果目标是mm/kfence/core.o，执行上面这个make后，对应的kbuid-file就是mm/Makefile，而里面的obj-y就包含kfence。
+
+此时又因为$(obj)不是"."了，所以subdir-ym里面的成员会加上$(obj)这个前缀，变成了mm/kfence。(这是关键)
+
+这样进一步导致single-subdirs赋值为mm/kfence，single-subdir-goals赋值为mm/kfence/core.o。就会生成一个针对mm/kfence/core.o的single-subdir-goals规则，并且依赖subdir-yw，也就是mm/kfence。
+
+这样就以obj=mm/kfence再调用一次make，进入到下层目录。到这里，就是一个递归了。
+
+如果目标还有下层目录，就按照这种方式不断往下一层目录走，到最后用cc_o_c来编译。
+
+# cc_o_c -- 最后一个规则
+
+我想应该是最后了吧，这次make调用，已经下到了mm目录，且目标就是mmu_gather.o。
 
 ```
 # Built-in and composite module parts
-$(obj)/%.o: $(src)/%.c $(recordmcount_source) $(objtool_obj) FORCE
-	$(call cmd,force_checksrc)
+$(obj)/%.o: $(obj)/%.c $(recordmcount_source) FORCE
 	$(call if_changed_rule,cc_o_c)
+	$(call cmd,force_checksrc)
 ```
 
-嗯，究竟是不是这条规则？ 还记得我们的丑办法么？留给大家自己试验一次～
+我想，终于是找到编译mmu_gather.o的最后那条规则了。
 
-依赖条件我们暂时也不看了，不是关注我们的目标--.o文件是怎么编译出来的。看这个规则中的两条命令，第一条是做代码检查的，那暂时也不关注吧。第二条看着名字就有点像，cc_o_c，把c代码通过cc制作成o文件。这个正是我们要关注的，就分析它了。
-
-# 接近真相
+## 接近真相
 
 上一节，我们把关注的焦点定在了这条语句。
 
@@ -161,7 +251,7 @@ if_changed_rule = $(if $(strip $(any-prereq) $(arg-check) ),      \
 
 这一路走来真是不容易。给自己倒杯咖啡，听听音乐，歇一歇。马上就要看到最后的结果了。
 
-# 云开日出
+## 云开日出
 
 经过对if_changed_rule的分析，我们停在了rule_cc_o_c上。现在的任务就是找到它。
 
@@ -197,30 +287,57 @@ cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 
 > At last, you got it.
 
-# 整顿行囊
+# 执行顺序总结
 
 刚才在探索如何编译单个.o文件的道路上一路飞奔，虽然终于我们找到了那条最最最后的语句在哪里，但是估计我们自己的行囊丢了一地。中间打下的江山可能自己也记不太清楚了。
 
 为了更好的理解kbuild，在下一次我们出发探索其他复杂的目标前，我们有必要在此总结这次探索的收获，就好像千里行军总得找个好地方，安营扎寨，整顿行囊，这样才能走得更远，更稳。
 
-## 执行顺序
-从文件执行顺序上整理如下：
+从最开始的Makefile开始，中间依赖了不少规则，是时候总结一下了。
 
 ```
     Makefile
     ---------------
-    %.o: %.c
-    	make -f scripts/Makefile.build obj=mm mm/memblock.o
+    $(single-no-ko): $(build-dir)              // 因为是single target，但实际是通过依赖build-dir编译
+        @:
+
+
+    Makefile
+    ---------------
+    build-dir	:= .                           // 回过头看，从最上层就有递归的意思了。
+    $(build-dir): prepare                      // 目标的依赖是一个目录，进入到目录用Makefile.build来构建。最开始都是根目录"."
+        $(Q)$(MAKE) $(build)=$@ need-builtin=1 need-modorder=1 $(single-goals)
+
 
     scripts/Makefile.build
     ---------------
-    $(obj)/%.o: $(src)/%.c
-    	$(call if_changed_rule,cc_o_c)
+    $(single-subdir-goals): $(single-subdirs)  // 匹配上single-subdir-goals，但实际是通过依赖single-subdirs编译
+        @:
+
 
     scripts/Makefile.build
+    ---------------
+    PHONY += $(subdir-ym)                      // single-subdirs 是 subdir-ym的一部分
+    $(subdir-ym):                              // 和Makefile中的规则很像，进入到对应的目录构建。
+        $(Q)$(MAKE) $(build)=$@ \
+        need-builtin=$(if $(filter $@/built-in.a, $(subdir-builtin)),1) \
+        need-modorder=$(if $(filter $@/modules.order, $(subdir-modorder)),1) \
+        $(filter $@/%, $(single-subdir-goals))
+
+
+    scripts/Makefile.build
+    ---------------
+    # Built-in and composite module parts      //通过递归，不断descend到目标文件锁在目录，最后真正从.c到.o。
+    $(obj)/%.o: $(obj)/%.c $(recordmcount_source) FORCE
+        $(call if_changed_rule,cc_o_c)
+        $(call cmd,force_checksrc)
+
+
+    scripts/Makefile.build                     // 具体的两条命令
     ---------------
     rule_cc_o_c
     	$(call cmd_and_fixdep,cc_o_c)
+
 
     scripts/Makefile.build
     ---------------
@@ -232,16 +349,7 @@ cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 
 在探索的过程中或许会有总也没有尽头的感觉，而现在整理完一看，一共也就四个层次，是不是觉得好像也没有那么难了？是不是觉得不过如此了？
 
-## scripts/Makefile.build
-
-这个文件几乎包含了所有重要的规则，rule_cc_o_c, cmd_cc_o_c都在这个文件中定义。以后我们会看到，凡事要进行编译工作，都会使用这个规则文件。
-
-## scripts/Kbuild.include
-
-这个文件包含了一些有意思的函数，if_changed_rule, cmd_and_fixdep。而且这个文件被根目录Makefile和scripts/Makefile.build都包含使用。
-
-好了，这下真的要歇一歇了。吃个大餐慰劳一下自己吧～
-
 [1]: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2aedcd098a9448b11eab895ee79acf519686555a
 [2]: /brief_tutorial_on_kbuild/04_one_example_of_kbuild_function_cscope.md
 [3]: http://linuxcommand.org/man_pages/cd1.html
+[4]: /brief_tutorial_on_kbuild/13_root_makefile.md

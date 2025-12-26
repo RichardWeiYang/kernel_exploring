@@ -113,7 +113,7 @@ abs_output := $(CURDIR)
 
 MAKEFILE_LIST保存了读取的所有makefile，最后一个是当前的。通过这种方式来得到当前真实目录。
 
-## sub_make判断是否要重新调用一次
+## sub_make判断
 
 这是根Makefile的第一部分，其中我们又可以分成两部分：
 
@@ -205,21 +205,7 @@ $(build-dir): prepare
 make -f ./scripts/Makefile.build obj=. need-builtin=1 need-modorder=1 ./mm/mmu_gather.o
 ```
 
-但是这还不是最后，进去后在Makefile.build里有single-subdir-goals
-
-```
-$(single-subdir-goals): $(single-subdirs)
-	@:
-```
-
-最后真正编译的规则是这条
-
-```
-# Built-in and composite module parts
-$(obj)/%.o: $(obj)/%.c $(recordmcount_source) FORCE
-	$(call if_changed_rule,cc_o_c)
-	$(call cmd,force_checksrc)
-```
+到这里还没有结束，接下去的深入探索我们放到[单个.o文件的编译][1]中。
 
 # kbuild
 
@@ -350,3 +336,4 @@ if-changed-cond = $(newer-prereqs)$(cmd-check)$(check-FORCE)
 
 这里判断了依赖和命令行有没有变化。最后这个FORCE的作用还不是很清楚。
 
+[1]: /brief_tutorial_on_kbuild/05_rules_for_single_object.md
