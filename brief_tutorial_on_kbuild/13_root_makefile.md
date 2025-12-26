@@ -241,29 +241,52 @@ make -f ./scripts/Makefile.build obj=. need-builtin=1 need-modorder=1 ./mm/mmu_g
 了解了这个调用方式后，就来看看这个Makefile.build的庐山真面目。
 
 ```
-src := $(obj)
+src := $(srcroot)/$(obj)
 
 默认目标
+PHONY := $(obj)/
 $(obj)/:
 
 -include include/config/auto.conf
 
 include scripts/Kbuild.include
-    设置kbuild-file变量，接下来将被引用。 srctree在根Makefile中定义
-    kbuild-dir = $(if $(filter /%,$(src)),$(src),$(srctree)/$(src))
-    kbuild-file = $(or $(wildcard $(kbuild-dir)/Kbuild),$(kbuild-dir)/Makefile)
+    设置kbuild-file变量，接下来将被引用。Kbuild优先级高
+    kbuild-file = $(or $(wildcard $(src)/Kbuild),$(src)/Makefile)
 include $(kbuild-file)
     定义了obj-y,obj-m等变量
 include scripts/Makefile.lib
-    根据kbuild-file设置了subdir-ym
 
 设置targets-for-modules，targets-for-builtin变量
 
-默认目标依赖了subdir-ym
+这个才是下降到最后目录时，从.c到.o的规则
+# Built-in and composite module parts
+$(obj)/%.o: $(obj)/%.c $(recordmcount_source) FORCE
+	@echo Built-in and  $@ $(obj)
+	$(call if_changed_rule,cc_o_c)
+	$(call cmd,force_checksrc)
+
+# Build
+# ---------------------------------------------------------------------------
+
+默认目标包含了所有相关的输出
 $(obj)/: $(if $(KBUILD_BUILTIN), $(targets-for-builtin)) \
 	 $(if $(KBUILD_MODULES), $(targets-for-modules)) \
 	 $(subdir-ym) $(always-y)
 	@:
+
+# Single targets
+# ---------------------------------------------------------------------------
+
+单个目标，如mm/mmu_gather.o。但实际上还是要走到下面的Descend，递归下降到最后的目录再执行。
+single-subdirs := $(foreach d, $(subdir-ym), $(if $(filter $d/%, $(MAKECMDGOALS)), $d))
+single-subdir-goals := $(filter $(addsuffix /%, $(single-subdirs)), $(MAKECMDGOALS))
+
+$(single-subdir-goals): $(single-subdirs)
+	@echo single-subdir-goals $@ $(obj)
+	@:
+
+# Descending
+# ---------------------------------------------------------------------------
 
 对每个subdir-ym，再执行make完成递归
 PHONY += $(subdir-ym)
