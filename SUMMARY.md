@@ -83,6 +83,8 @@
     * [memcg初始化](memcg/01-init_overview.md)
     * [限制memcg大小](memcg/02-set_memcg_limit.md)
     * [对memcg记账](memcg/03-charge_memcg.md)
+  * 性能优化
+    * [批量处理](mm/01-perf_opt.md)
   * 通用
     * [常用全局变量](mm/common/00_global_variable.md)
     * [常用转换](mm/common/01_important_transform.md)
