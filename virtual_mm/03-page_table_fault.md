@@ -253,7 +253,7 @@ do_anonymous_page()
 
 其他的锁搜保存在特定的页表页中
 
-  * pmd_lockptr(): pmd_pgtable_page(pmd)
+  * pmd_lockptr(): pmd_pgtable_page(pmd)，这个是PMD level页表
   * pte_lockptr(): pmd_page(*pmdp)
   * ptep_lockptr(): virt_to_page(ptep)
 
@@ -261,8 +261,10 @@ do_anonymous_page()
 直观一些，我慢来看看这几个锁在那里。
 
 ```
-      PMD               +---pmd_lockptr()
-      +--------------+<-+                    /--pte_lockptr()
+                     +------pmd_lockptr() / pmd_pgtable_page()
+      PMD            v
+      +--------------+
+      |              |                       /--pte_lockptr() / pmd_page()
       |              |        PTE           v   ptep_lockptr()
       |              | -----> +--------------+
       |              |        |              |
