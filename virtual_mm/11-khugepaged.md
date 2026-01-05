@@ -100,6 +100,131 @@ vma级扫描也是在函数collapse_scan_mm_slot()里，不过是在for_each_vma
 
 先把swapout的页面拿进来，然后隔离，最后把内容拷贝到新分配的大页。如果成功了，将原先的页面释放，否则恢复原先页面。
 
+# TRACE事件
+
+在代码中增加了trace用来观察khugepaged的行为，便于后期优化。
+
+## 定义和记录
+
+首先在文件include/trace/events/huge_memory.h中定义了TRACE_EVENT。
+
+比如:
+
+```
+TRACE_EVENT(mm_khugepaged_scan_pmd,
+		...
+
+```
+
+然后在代码中需要的位置，加上
+
+```
+	trace_mm_khugepaged_scan_pmd(mm, folio, referenced,
+				     none_or_zero, result, unmapped);
+```
+
+这里传入的参数都在TRACE_EVENT定义的时候指定。
+
+## 观察event
+
+代码是加上了，我们来看看怎么观测。对应的方式有很多，我们来看看最原始的一种。
+
+### 位置
+
+对应的trace的sysfs在/sys/kernel/tracing/events/huge_memory/。拿上面的 TRACE_EVENT(mm_khugepaged_scan_pmd, ...)来说，就是在
+
+```
+/sys/kernel/tracing/events/huge_memory/mm_khugepaged_scan_pmd
+```
+
+这个目录下有多个文件：
+
+```
+# ls /sys/kernel/tracing/events/huge_memory/mm_khugepaged_scan_pmd/
+enable  filter  format  hist  id  inject  trigger
+```
+
+目前了解下来，要是用trace来观测，需要这么几个步骤。
+
+  - 了解格式
+  - 定制输出
+  - 使能事件
+  - 观察输出
+
+### 了解格式
+
+每一个trace事件的输出是不同的，了解这个输出是为了后面定制化事件的输出。
+
+输出的格式在format文件中。
+
+
+```
+# cat format
+name: mm_khugepaged_scan_pmd
+ID: 689
+format:
+	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+	field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+	field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+	field:int common_pid;	offset:4;	size:4;	signed:1;
+
+	field:struct mm_struct * mm;	offset:8;	size:8;	signed:0;
+	field:unsigned long pfn;	offset:16;	size:8;	signed:0;
+	field:bool writable;	offset:24;	size:1;	signed:0;
+	field:int referenced;	offset:28;	size:4;	signed:1;
+	field:int none_or_zero;	offset:32;	size:4;	signed:1;
+	field:int status;	offset:36;	size:4;	signed:1;
+	field:int unmapped;	offset:40;	size:4;	signed:1;
+```
+
+这些其实在TRACE_EVENT定义里就能看到，不过为了用户方便，还是在用户态暴露了出来。
+
+### 定制输出
+
+我们看到上面输出这么多，不一定每次都需要。所以我们可以通过trigger文件定制化事件的输出。
+
+比如mm_khugepaged_scan_pmd这个事件，查看result情况并按照触发次数排序。就可以这么设置：
+
+```
+echo 'hist:keys=status:sort=hitcount' > trigger
+```
+
+PS: 这只是最基本的，感觉要还有很多不同的用法。
+
+### 使能事件
+
+这个比较简单
+
+```
+echo 1 > enable
+```
+
+### 观察输出
+
+事件采集到了hist文件，我们看下刚才这么设置后的输出。
+
+```
+# cat hist
+# event histogram
+#
+# trigger info: hist:keys=status:vals=hitcount:sort=hitcount:size=2048 [active]
+#
+
+{ status:          7 } hitcount:         19
+{ status:          6 } hitcount:         21
+{ status:          5 } hitcount:         23
+{ status:          1 } hitcount:         37
+{ status:          3 } hitcount:         46
+{ status:          4 } hitcount:        388
+
+Totals:
+    Hits: 534
+    Entries: 6
+    Dropped: 0
+```
+
+从这个结果看，这段事件内mm_khugepaged_scan_pmd的结果中，返回4的是最多的。
+
 # 测试
 
 针对大页合并，内核中提供了一个用户态的测试程序。
@@ -107,5 +232,6 @@ vma级扫描也是在函数collapse_scan_mm_slot()里，不过是在for_each_vma
 tools/testing/selftests/mm/khugepaged.c
 
 这算是[selftests][1]的一个例子。
+
 
 [1]: /mm/tests/01_functional_test.md
