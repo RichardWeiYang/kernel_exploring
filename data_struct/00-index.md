@@ -2,9 +2,7 @@
 
 在这一章节，本人打算总结一下代码中遇到过的那些有意思的数据结构们。
 
-# 链表
-
-链表是软件中常用的数据结构了，虽然没有什么新花头，但是架不住用的多。而且内核中为了自身需求还演化出了新花样。
+[Per CPU变量][8]
 
 [双链表][1]
 
@@ -27,3 +25,4 @@
 [5]: /data_struct/05-btree.md
 [6]: /data_struct/06-maple_tree.md
 [7]: /data_struct/07-interval_tree.md
+[8]: /data_struct/static_pcpu.md

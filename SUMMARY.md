@@ -150,6 +150,7 @@
   * [TraceEvent](tracing/02-trace_event.md)
   * [Drgn](tracing/06-drgn.md)
 * [内核中的数据结构](data_struct/00-index.md)
+  * [Per CPU变量](data_struct/static_pcpu.md)
   * [双链表](data_struct/01-list.md)
   * [优先级队列](data_struct/03-plist.md)
   * [哈希表](data_struct/02-hlist.md)
