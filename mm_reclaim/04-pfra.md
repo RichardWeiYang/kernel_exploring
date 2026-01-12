@@ -35,11 +35,11 @@
 	* LRU_ACTIVE_ANON
 	* LRU_INACTIVE_FILE
 	* LRU_ACTIVE_FILE
-	* LRU_UNEVICTABLE,
+	* LRU_UNEVICTABLE
 
 简单来说，回收的过程就是从lru lists上找到合适的page做回收。
 
-# lruvec在哪里
+## lruvec在哪里
 
 lruvec是可以理解成一个系统中已经分配除去的页面的集散地，目的是为了后续释放而存在的。要找到这个lruvec在哪里，我们就要看folio_lruvec()这个函数。
 
@@ -186,6 +186,12 @@ static void folio_batch_move_lru(struct folio_batch *fbatch, move_fn_t move_fn)
 
 而这些就是将folio放到对应lruvec上链表的具体操作了。
 
+## mlock_fbatch
+
+除了上面者几种batch，还有一个比较特殊的batch -- mlock_fbatch。
+
+这个是专门为mlock相关的操作使用的。
+
 ## pagevec -- 老版本
 
 半路杀出个程咬金，lruvec的怎么又出来了个pagevec？怎么讲呢，内核为了减少锁竞争，在把页放入lruvec前，先放到percpu的pagevec上。相当于做了一个软cache。
@@ -255,54 +261,99 @@ static void folio_batch_move_lru(struct folio_batch *fbatch, move_fn_t move_fn)
   * 其余的pagevec都通过pagevec_add_and_need_flush检查后，做相应的操作
   * folio_add_lru/mlock_new_page 是两个加入到pagevec的入口函数
 
-# 将folio放到lru
+## 消失的LRU_UNEVICTABLE
 
-在上面的分析中，我们看到folio_batch_move_lru()函数接收的move_fn可以有下面六中情况:
+在lruvec定义中，lru的list一共有五个。但是仔细看真正操作list的函数：lruvec_add_folio()/lruvec_add_folio_tail()，最后都过滤了LRU_UNEVICTABLE。当时我很纳闷究竟什么时候会添加到这个链表。
 
-  * lru_add
-  * lru_deactivate_file
-  * lru_deactivate
-  * lru_lazyfree
-  * lru_activate
-  * lru_move_tail
+直到看到了__mlock_folio()的注释。
 
-这些才是真正操作lruvec的地方。
+```
+ * An mlocked folio [folio_test_mlocked(folio)] is unevictable.  As such, it
+ * will be ostensibly placed on the LRU "unevictable" list (actually no such
+ * list exists), rather than the [in]active lists. PG_unevictable is set to
+ * indicate the unevictable state.
+```
 
-比如lru_add将folio添加到lruvec->lists[lru]; lru_deactivate将folio从active上取下，放到deactivate的链表上。
+实际上根本就没有用这个链表，也是，不需要回收，所以也不会去扫描吧。
 
-## lru_add
+# API 整理
 
-最后计算添加到哪个list的时候，folio_lru_list() -> folio_is_file_lru()中，对于lazyfree的匿名页，也会放到file list上。
+最核心操作lruvec的函数只有三个：
 
-我估计是因为这部分的页面在回收时没有swapbacked所以回收成本和file页面一样。
+  * lruvec_add_folio()
+  * lruvec_add_folio_tail()
+  * lruvec_del_folio()
 
-但是在lruvec_add_folio()中，针对LRU_UNEVICTABLE类型，没有添加到链表中。。。那这部分何时添加的？
+但根据不同的需求，内核中对操作进行了一定的封装，下面尝试按照不同的类型分类整理。
 
-另外lurvec_add_folio()是添加到列表头部，添加到尾部是用lruvec_add_folio_tail()。
+```
+                                 folio_add_lru()
+                                 folio_activate()
+                                 folio_deactivate()
+    mlock_folio()                deactivate_file_folio()
+    mlock_new_folio()            folio_mark_lazyfree()
+    munlock_folio()              folio_rotate_reclaimable()
+           |                           |
+           |                           |
+           |                           |
+           v                           v
+    mlock_folio_batch()          folio_batch_add_and_move()
+           |                           |
+           |                           |
+           |                           |
+           v                           v
+    __mlock_new_folio()          lru_add()                      move_folios_to_lru()
+    __mlock_folio()              lru_activate()                 drain_evictable()
+    __munlock_folio()            lru_deactivate()               check_move_unevictable_folios()
+                                 lru_deactivate_file()          sort_folio()
+                                 lru_lazyfree()
+                    \                  |                     /
+                              \        |       /
+                                     \ | /
+                                       v
+                                 lruvec_add_folio()
 
-## lru_deactivate_file
 
-不会处理unevictable和还有进程映射的folio。
 
-脏页和writeback中的，插到表头。干净的插到表尾。
+                                  lru_move_tail()
+                                  lru_deactivate_file()
+                                       |
+                                       |
+                                       v
+                                 lruvec_add_folio_tail()
 
-## lru_deactivate
 
-都插到表尾。
 
-## lru_lazyfree
 
-清除active, referenced标识。
+    __mlock_folio()              __page_cache_release()         folio_isolate_lru()
+    __munlock_folio()            lru_move_tail()                fill_evictable()
+                                 lru_activate()                 check_move_unevictable_folios()
+                                 lru_deactivate()
+                                 lru_deactivate_file()          isolate_migratepages_block()
+                                 lru_lazyfree()
 
-而且还要清除swapbacked标识， 这样在lruvec_add_folio()->folio_is_file_lru()中就被认为是放到file 链表上。
+                    \                  |                     /
+                              \        |       /
+                                     \ | /
+                                       v
+                                 lruvec_del_folio()
 
-## lru_activate
+```
 
-将非active的页面，设置active标识，并转放到active列表。
+虽然有很多函数会调用lruvec_add_folio()/lruvec_del_folio()，但并不是表示folio就添加到lruvec或者从lruvec上删除了。因为很多操作是从一个链表移动到了另一个链表。
 
-## lru_move_tail
+真正添加到lruvec的：
 
-不管是否active，清除active标识，放到inactive列表最后。(最容易回收)
+  * __mlock_new_folio()
+  * lru_add()
+  * move_folios_to_lru()
+
+真正从lruvec删除的：
+
+  * __page_cache_release()
+  * folio_isolate_lru()
+
+另外mlock是比较特殊的一支，他还用了单独的mlock_fbatch.
 
 [1]: https://www.kernel.org/doc/gorman/html/understand/
 [2]: https://www.kernel.org/doc/gorman/html/understand/understand013.html
