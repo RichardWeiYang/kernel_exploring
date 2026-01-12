@@ -270,5 +270,39 @@ static void folio_batch_move_lru(struct folio_batch *fbatch, move_fn_t move_fn)
 
 比如lru_add将folio添加到lruvec->lists[lru]; lru_deactivate将folio从active上取下，放到deactivate的链表上。
 
+## lru_add
+
+最后计算添加到哪个list的时候，folio_lru_list() -> folio_is_file_lru()中，对于lazyfree的匿名页，也会放到file list上。
+
+我估计是因为这部分的页面在回收时没有swapbacked所以回收成本和file页面一样。
+
+但是在lruvec_add_folio()中，针对LRU_UNEVICTABLE类型，没有添加到链表中。。。那这部分何时添加的？
+
+另外lurvec_add_folio()是添加到列表头部，添加到尾部是用lruvec_add_folio_tail()。
+
+## lru_deactivate_file
+
+不会处理unevictable和还有进程映射的folio。
+
+脏页和writeback中的，插到表头。干净的插到表尾。
+
+## lru_deactivate
+
+都插到表尾。
+
+## lru_lazyfree
+
+清除active, referenced标识。
+
+而且还要清除swapbacked标识， 这样在lruvec_add_folio()->folio_is_file_lru()中就被认为是放到file 链表上。
+
+## lru_activate
+
+将非active的页面，设置active标识，并转放到active列表。
+
+## lru_move_tail
+
+不管是否active，清除active标识，放到inactive列表最后。(最容易回收)
+
 [1]: https://www.kernel.org/doc/gorman/html/understand/
 [2]: https://www.kernel.org/doc/gorman/html/understand/understand013.html
