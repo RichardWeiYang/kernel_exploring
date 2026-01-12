@@ -110,7 +110,7 @@ Date:   Mon Dec 6 15:24:51 2021 -0500
     to contain folios and not pages.
 ```
 
-除了数据结构的变化，操作上也发生了变化。我猜现在操作上主要都几种到了函数folio_batch_add_and_move()。
+除了数据结构的变化，操作上也发生了变化。我猜现在操作上主要都集中到了函数folio_batch_add_and_move()。
 
 ```
 static void __folio_batch_add_and_move(struct folio_batch __percpu *fbatch,
