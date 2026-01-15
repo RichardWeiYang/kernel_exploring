@@ -152,4 +152,4 @@ if (alloc_flags & ALLOC_KSWAPD)
   * __alloc_pages_slowpath -> can_direct_reclaim
   * node_reclaim() -> gfpflags_allow_blocking()
 
-[8]: /mm_reclaim/03-big_picture.md
+[1]: /mm_reclaim/03-big_picture.md

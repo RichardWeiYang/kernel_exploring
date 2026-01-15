@@ -78,7 +78,7 @@
   * [内存的回收再利用](mm_reclaim/00-index.md)
     * [水线](mm_reclaim/02-watermark.md)
     * [Big Picture](mm_reclaim/03-big_picture.md)
-    * [手动触发回收](mm_reclaim/05-do_reclaim.md)
+    * [手动触发回收](mm_reclaim/05-trigger_reclaim.md)
     * [Page Fram Reclaim Algorithm](mm_reclaim/04-pfra.md)
     * [swapfile原理使用和演进](mm_reclaim/01-swapfile.md)
   * [内存隔离](memcg/00-index.md)

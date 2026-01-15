@@ -37,4 +37,4 @@ linux内核的设计理念是尽量多使用内存，这样可以最大化系统
 [7]: https://zhuanlan.zhihu.com/p/73539328
 [8]: /mm_reclaim/03-big_picture.md
 [9]: /mm_reclaim/04-pfra.md
-[10]: /mm_reclaim/05-do_reclaim.md
+[10]: /mm_reclaim/05-trigger_reclaim.md
