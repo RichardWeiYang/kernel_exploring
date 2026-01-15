@@ -79,6 +79,7 @@
     * [水线](mm_reclaim/02-watermark.md)
     * [Big Picture](mm_reclaim/03-big_picture.md)
     * [手动触发回收](mm_reclaim/05-trigger_reclaim.md)
+    * [回收的核心逻辑](mm_reclaim/06_reclaim_core.md)
     * [Page Fram Reclaim Algorithm](mm_reclaim/04-pfra.md)
     * [swapfile原理使用和演进](mm_reclaim/01-swapfile.md)
   * [内存隔离](memcg/00-index.md)
