@@ -55,17 +55,19 @@ page中，在这里我们把相关的内容抽出来看，更清楚理解其中�
 
 ```
 do_pte_missing()
-    do_anonymous_page()
+    do_anonymous_page()                                   // 匿名页
         folio_add_new_anon_rmap()
             __folio_set_anon()
-                WRITE_ONCE(folio->mapping, anon_vma)
+                WRITE_ONCE(folio->mapping, anon_vma)      <--- 设置为anon_vma
     do_fault()
-        do_cow_fault()
+        do_cow_fault()                                    // 文件页
             vma->vm_ops->fault() -> filemap_fault()
-                __filemap_get_folio()
+                file = vmf->vma->vm_file
+                mapping = file->f_mapping
+                __filemap_get_folio(mapping, index)
                     filemap_add_folio()
                         __filemap_add_folio()
-                            folio->mapping = mapping
+                            folio->mapping = mapping      <--- 设置为mapping
 ```
 
 # 增加和减少rmap的函数
