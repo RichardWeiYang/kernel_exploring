@@ -119,8 +119,8 @@ do_pte_missing()
 这里我们只看!CONFIG_NO_PAGE_MAPCOUNT的情况。
 
   * 增加所有page的_mapcount计数
-  * 增加folio->_large_mapcount计数
   * 增加folio->_nr_pages_mapped计数
+  * 增加folio->_large_mapcount计数
   * 调整folio stats
 
 其中第一点比较好理解，第二点其实也还行，不过增加的数量是page数量而不是folio的数量(因为这里是作为单个page映射的)。比较绕的是第三、四点。
@@ -138,15 +138,15 @@ do_pte_missing()
 		    atomic_add_return_relaxed(first, mapped) < ENTIRELY_MAPPED)
 			nr = first;
 
+		folio_add_large_mapcount(folio, orig_nr_pages, vma);
+
 	__folio_mod_stat(folio, nr, nr_pmdmapped);
 ```
 
-首先遍历folio中的page，增加page->_mapcount。不过这里的重点是看看其中多少是第一次被映射的。
-如果有第一次被映射的，然后才会去考虑调整folio->_nr_pages_mapped。因为这个值表示的是folio中有多少页被映射过，每个页面只计数一次。
-
-第四点和非PTE map相关，也就是为了简化_nr_pages_mapped表达，其中做了一个边界值ENTIRELY_MAPPED。如果已经设置过这个值了，说明folio被整体映射过，那也就不需要调整统计值了。
-
-当然也可以不这么做，每次都检查一下folio->_entire_mapcount。但是这么做会多计算。
+  1. 首先遍历folio中的page，增加page->_mapcount。顺便看看其中多少是第一次被映射的 -- first。
+  2. 如果有第一次被映射的，然后才会去考虑调整folio->_nr_pages_mapped。因为这个值表示的是folio中有多少页被映射过，每个页面只计数一次。
+  3. 增加folio->_large_mapcount计数 nr_pages，这样对于large folio，可以直接读取这个值得到映射数，而不用遍历所有page。
+  4. 第四点和非PTE map相关，也就是为了简化_nr_pages_mapped表达，其中做了一个边界值ENTIRELY_MAPPED。如果已经设置过这个值了，说明folio被整体映射过，那也就不需要调整统计值了。 当然也可以不这么做，每次都检查一下folio->_entire_mapcount。但是这么做会多计算。
 
 ### 非PTE map
 
@@ -154,11 +154,12 @@ do_pte_missing()
 
   * 增加folio->_entire_mapcount
   * folio->_nr_pages_mapped计数 + ENTIRELY_MAPPED
+  * 增加folio->_large_mapcount
   * 调整folio stats
 
-这里1、3比较清楚，2需要解释一下。
+其中第二点值得解释。因为在调整统计值的时候，我们调整的是有多少新增页被映射。虽然我们映射了一整个folio，但是为了这个目的，我们要知道之前已经映射了多少。而这个值要通过folio->_nr_pages_mapped取低位来得到。
 
-因为在调整统计值的时候，我们调整的是有多少新增页被映射。虽然我们映射了一整个folio，但是为了这个目的，我们要知道之前已经映射了多少。而这个值要通过folio->_nr_pages_mapped取低位来得到。
+另外第三点，folio->_large_mapcount在非PTE映射时，只计数1,而PTE映射计数nr_pages。语义上表示这个folio在页表中占多少page table entry.
 
 ## __folio_remove_rmap
 
