@@ -210,5 +210,38 @@ PS: 对@lock_at锁在的folio则会跳过这个操作，这样调用者就能继
 
 # THP 合并
 
+我们只观察匿名页合并成THP的情况，也就是hpage_collapse_scan_pmd() -> collapse_huge_page()函数中的相关操作。
+
+```
+collapse_huge_page()
+    alloc_charge_folio(&folio, )
+        __folio_alloc()
+            set_page_refcounted(page)                         // new_folio's refcount = 1
+
+    __collapse_huge_page_isolate()
+        pteval = ptep_get()
+        page = vm_normal_page(vma, addr, pteval)
+        folio = page_folio(page)
+        folio_trylock(folio)
+	// 此时需要保证refcount没有额外的计数，
+        //       对于没有加入swapcache的匿名页 mapcount == refcount
+        // folio_expected_ref_count(folio) == folio_ref_count(folio)
+        folio_isolate_lru(folio)
+            folio_get(folio)                                  // old_folio's refcount += 1 (for isolation)
+
+    __collapse_huge_page_copy()
+        __collapse_huge_page_copy_succeeded()
+            pteval = ptep_get(_pte);
+            src_page = pte_page(pteval)
+            src = page_folio(src_page)
+            folio_unlock(src)
+            folio_putback_lru(src)
+                folio_put(src)                                // old_folio's refcount -= 1 (for unisolation)
+            folio_remove_rmap_ptes()                          // old_folio's mapcount -= 1
+            folio_put_refs()                                  // old_folio's refcount -= 1 (for unmap)
+    map_anon_folio_pmd_nopf()
+        folio_add_new_anon_rmap()                             // new_folio's large_mapcount = 1
+```
+
 [1]: /virtual_mm/09-mapcount.md
 [2]: /virtual_mm/13-thp_split.md
