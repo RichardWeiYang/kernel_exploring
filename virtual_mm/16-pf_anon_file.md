@@ -75,13 +75,13 @@ do_fault
 ```
 do_read_fault()
     __do_fault()
-        vma->vm_ops->fault() -> filemap_fault()
+        vma->vm_ops->fault() -> filemap_fault()                    // refcount = nr_pages + 1
             folio = filemap_get_folio()
             vmf->page = folio_file_page(folio, index)
     finish_fault()
-        folio_ref_add(folio, nr_pages - 1)
+        folio_ref_add(folio, nr_pages - 1)                         // refcount = nr_pages * 2
         set_pte_range()
-            folio_add_file_rmap_ptes(folio, )
+            folio_add_file_rmap_ptes(folio, nr_pages)              // mapcount = nr_pages
 ```
 
 读很正常，这三种情况都会从文件中读取。
@@ -101,7 +101,7 @@ do_read_fault()
 ```
 do_cow_fault
     vmf_anon_prepare(vmf)
-    folio = folio_prealloc()
+    folio = folio_prealloc()                                       // refcount = 1
     vmf->cow_page = &folio->page
     __do_fault()
         vma->vm_ops->fault() -> filemap_fault()
@@ -109,9 +109,9 @@ do_cow_fault
             vmf->page = folio_file_page(folio, index)
     copy_mc_user_highpage(vmf->cow_page, vmf->page...)
     finish_fault()
-        folio_ref_add(folio, nr_pages - 1)
+        folio_ref_add(folio, nr_pages - 1)                         // refcount = nr_pages
         set_pte_range()
-            folio_add_new_anon_rmap(folio, )
+            folio_add_new_anon_rmap(folio, )                       // mapcount = nr_pages
 ```
 
 首先看到的是，执行了vmf_anon_prepare()也就是准备了匿名反向映射的数据结构。但是这也满神奇的。因为一个filemap的vma，竟然还有anon_vma。
@@ -170,23 +170,25 @@ filemap_fault
         filemap_add_folio(mapping, folio, index, gfp)          // add into pagecache
             __folio_set_locked(folio)
             __filemap_add_folio(mapping, folio, index, ...)
-                folio_ref_add(folio, nr)                       // refcount = 1 + nr
+                folio_ref_add(folio, nr_pages)                 // refcount = 1 + nr_pages
 
     vmf->page = folio_file_page(folio, index)
 
 finish_fault
-    folio_ref_add(folio, nr_pages - 1)                         // refcount = 2 * nr
+    folio_ref_add(folio, nr_pages - 1)                         // refcount = 2 * nr_pages
+    set_pte_range()
+        folio_add_file_rmap_ptes(folio, nr_pages)              // mapcount = nr_pages
 ```
 
-## refcount变化
+## refcount和mapcount变化
 
 先来看看，如果是一个新的页面添加到pagecache时计数的变化：
 
   * filemap_alloc_folio:   1
-  * __filemap_add_folio:  +nr
-  * finish_fault:         +nr-1
+  * __filemap_add_folio:  +nr_pages
+  * finish_fault:         +nr_pages-1
 
-所以最后计数值是2*nr，这个值和folio_expected_ref_count()得到值对应。
+所以最后计数值是2*nr_pages，而在set_pte_range()中增加的mapcount是nr_pages。这样正好符合folio_expected_ref_count()的预期。
 
 ## do_sync_mmap_readahead()
 
