@@ -171,6 +171,9 @@ filemap_fault
             __folio_set_locked(folio)
             __filemap_add_folio(mapping, folio, index, ...)
                 folio_ref_add(folio, nr_pages)                 // refcount = 1 + nr_pages
+                folio->mapping = mapping;
+                folio->index = xas.xa_index;
+            folio_add_lru(folio)
 
     vmf->page = folio_file_page(folio, index)
 
