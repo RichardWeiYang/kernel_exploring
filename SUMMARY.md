@@ -99,6 +99,7 @@
       * [meminfo](mm/statistics/07-meminfo.md)
       * [vmstat](mm/statistics/08-vmstat.md)
       * [kpageflags](mm/statistics/03-kpageflags.md)
+      * [kpagecount](mm/statistics/12-kpagecount.md)
       * [slabinfo](mm/statistics/09-slabinfo.md)
       * [buddyinfo](mm/statistics/10-buddyinfo.md)
       * [zoneinfo](mm/statistics/11-zoneinfo.md)
