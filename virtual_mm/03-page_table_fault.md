@@ -261,11 +261,13 @@ do_anonymous_page()
 直观一些，我慢来看看这几个锁在那里。
 
 ```
-                     +------pmd_lockptr() / pmd_pgtable_page()
+                       +------pmd_lockptr(mm, pmdp) / pmd_pgtable_page(pmdp)
+                      /
       PMD            v
       +--------------+
-      |              |                       /--pte_lockptr() / pmd_page()
-      |              |        PTE           v   ptep_lockptr()
+      |              |                        +--pte_lockptr(mm, pmdp) / pmd_page(pmd)
+      |              |                       /   ptep_lockptr()
+      |              |        PTE           v
       |              | -----> +--------------+
       |              |        |              |
       +--------------+        |              |
@@ -274,6 +276,73 @@ do_anonymous_page()
 ```
 
 也就是pmd_lockptr()存放在PMD的页表里，而pte_lockptr()和ptep_lockptr()都在PTE页表里。
+
+## pmd_lockptr(mm, pmdp)
+
+```
+static inline struct page *pmd_pgtable_page(pmd_t *pmd)
+{
+	unsigned long mask = ~(PTRS_PER_PMD * sizeof(pmd_t) - 1);
+	return virt_to_page((void *)((unsigned long) pmd & mask));
+}
+
+static inline struct ptdesc *pmd_ptdesc(pmd_t *pmd)
+{
+	return page_ptdesc(pmd_pgtable_page(pmd));
+}
+
+static inline spinlock_t *pmd_lockptr(struct mm_struct *mm, pmd_t *pmd)
+{
+	return ptlock_ptr(pmd_ptdesc(pmd));
+}
+```
+
+这个代码很有意思，先是拿到pmd的指针，这个指针是PMD层级中的512项(PTRS_PER_PMD)其中之一。然后和一个mask与操作。这个mask正好是512项pmd指针对齐。
+
+所以最后拿到的锁，是在PMD这个层级页表上的。
+
+## pte_lockptr(mm, pmdp)
+
+```
+static inline unsigned long pmd_pfn(pmd_t pmd)
+{
+	phys_addr_t pfn = pmd_val(pmd);
+	pfn ^= protnone_mask(pfn);
+	return (pfn & pmd_pfn_mask(pmd)) >> PAGE_SHIFT;
+}
+
+#define pmd_page(pmd)	pfn_to_page(pmd_pfn(pmd))
+
+static inline spinlock_t *pte_lockptr(struct mm_struct *mm, pmd_t *pmd)
+{
+	return ptlock_ptr(page_ptdesc(pmd_page(*pmd)));
+}
+```
+
+这恶展开和上面的pmd_lockptr()很像，传进去的参数都是一样的。就是差在这里是用pmd_page(*pmd)去找的页表。这个页表是pmd中保存的值所指向的页表。
+
+所以最后拿到的锁，是在PTE这个层级页表上的。
+
+## ptep_lockptr(mm, ptep)
+
+```
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+
+static inline struct ptdesc *virt_to_ptdesc(const void *x)
+{
+	return page_ptdesc(virt_to_page(x));
+}
+
+static inline spinlock_t *ptep_lockptr(struct mm_struct *mm, pte_t *pte)
+{
+	BUILD_BUG_ON(IS_ENABLED(CONFIG_HIGHPTE));
+	BUILD_BUG_ON(MAX_PTRS_PER_PTE * sizeof(pte_t) > PAGE_SIZE);
+	return ptlock_ptr(virt_to_ptdesc(pte));
+}
+
+```
+
+这里是通过找到pte这个虚拟地址所在page来找到锁的。其实这个和pmd_lockptr()的方法是一样的。为什么这两个不写成一样呢？
 
 # 参考文档
 
