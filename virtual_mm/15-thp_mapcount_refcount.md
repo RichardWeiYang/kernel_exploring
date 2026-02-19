@@ -208,6 +208,58 @@ PS: 对@lock_at锁在的folio则会跳过这个操作，这样调用者就能继
 
 这个情况略微有点特殊，也就是**当split中有一个list参数的时候**，对拆分下来的新页会额外再增加一个计数。这样这个新拆分的folio就能够被添加到原有的处理逻辑，作为下一次继续处理的单元。（因为原先加到list的folio，也是增加了计数后添加到链表里的）
 
+## 全局视图
+
+我们来看看一个**不在swapcache中的匿名页**拆分后，folio和after split folio的refcount/mapcount变化
+
+```
+__folio_split()
+    // folio_expected_ref_count(folio) == folio_ref_count(folio) - 1
+
+    unmap_folio()
+        try_to_migrate() -> try_to_migrate_one()
+            split_huge_pmd_locked()
+                folio_remove_rmap_pmd()
+                    __folio_remove_rmap(, PGTABLE_LEVEL_PMD)
+                        folio_dec_large_mapcount(folio, vma)                   // folio large_mapcoun -= 1;
+                folio_put()                                                    // folio refcount -= 1
+
+    __folio_freeze_and_split_unmapped(folio, split_at, list)
+        folio_ref_freeze(folio, folio_cache_ref_count(folio) + 1)              // folio refcount = 0
+        folio_ref_unfreeze(new_folio, folio_cache_ref_count(new_folio) + 1)    // new_folio refcount = 1
+        if list, folio_get(new_folio), execpt first folio
+
+    remap(folio, )                                                             // new_folio refcount += mapcount
+    new_folio, except lock_at
+       folio_unlock(new_folio)
+       folio_put(new_folio)
+```
+
+目前这代码写得有点复杂，要分两种情况来看。
+
+  * list为空，表示拆分后的folio要放到lru链表上
+  * list不为空，表示拆分后的folio要放到list上
+
+先来看list为空的情况: PS: 感觉这里隐含着原folio还在lru链表上
+
+    new_folio refcount先都设置为nr_pages + 1
+    除了第一个folio, new_folio都放到lru链表上
+    除了lock_at所在的new_folio, unlock且refount 减1
+    所以最后lock_at的new_folio, 保持split前的状态， locked && refcount 比预期多1
+    并且所有的new_folio还都在lru上
+
+再来看list不为空的情况： PS：感觉这里隐含着原folio已经不在lru链表上了
+
+    new_folio refcount先都设置为nr_pages + 1
+    除了第一个folio, new_folio的refcount再加1，且这个时候new_folio没有在lru链表上
+    除了lock_at所在的new_folio, unlock且refount 减1
+    最后所有的folio保持不在lru链表上。除了第一个folio，其余都在list链表上。
+    如果lock_at是第一个folio，那么所有refcount都是nr_pages + 1
+    但如果lock_at不是第一个folio，好像有点问题？
+
+后来发现证实[3]，在list不为空的情况下，lock_at只能是head。这是一个隐藏了差不多十年的问题。不过还好，还没有人这么使用，所以没有报错。
+
+
 # THP 合并
 
 我们只观察匿名页合并成THP的情况，也就是hpage_collapse_scan_pmd() -> collapse_huge_page()函数中的相关操作。
@@ -245,3 +297,4 @@ collapse_huge_page()
 
 [1]: /virtual_mm/09-mapcount.md
 [2]: /virtual_mm/13-thp_split.md
+[3]: https://lkml.kernel.org/r/6346656B-7518-4A55-8DEF-C2E975714C8B@nvidia.com
