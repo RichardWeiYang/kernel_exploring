@@ -57,6 +57,7 @@
     * [页表和缺页中断](virtual_mm/03-page_table_fault.md)
       * [匿名和文件缺页中断](virtual_mm/16-pf_anon_file.md)
       * [页表的释放](virtual_mm/18-teardown_page_table.md)
+      * [Folio.index](virtual_mm/21-folio_index.md)
     * [虚拟地址空间的管家--vma](virtual_mm/05-vma.md)
       * [私有和共享映射](virtual_mm/17-map_private_shared.md)
     * [反向映射](virtual_mm/19-rmap.md)
