@@ -30,11 +30,15 @@ static inline pgoff_t linear_page_index(const struct vm_area_struct *vma,
             filemap_fault
                 index = vmf->pgoff
                 __filemap_get_folio(, index, ) -> __filemap_get_folio_mpol(, index, )
+
+                    index = mapping_align_index(mapping, index);      // index对齐文件系统最小order
+                    order = __ffs(index);                             // order是从index对齐地址i中获取的
+                    folio = filemap_alloc_folio(, order, );           // 再用order去分配folio,所以隐含了index和order对齐的信息
+
                     filemap_add_folio(folio, index, )
                         __filemap_add_folio(folio, index, )
                             XA_STATE_ORDER(xas, &mapping->i_pages, index, folio_order(folio))
                             folio->index = xas.xa_index;              // 实际上就是文件内偏移
-                                                                         不过会folio_order()对齐
 ```
 
 [1]: /virtual_mm/05-vma.md
