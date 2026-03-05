@@ -232,7 +232,7 @@ xas_error():   xa_err(xas->xa_node)
 
 我们先来看看这些转换都做了什么：
 
-  * (index >> order) << order: 这个是将index低位清零。
+  * (index >> order) << order: 这个是将index低位清零。有对齐index的作用
   * order - (order % XA_CHUNK_SHIFT): 这个找到order能表达的最大倍数的XA_CHUNK_SHIFT
   * (1U << (order % XA_CHUNK_SHIFT)) - 1: 表达了order中去除最大倍数XA_CHUNK_SHIFT后剩余的个数（**减1**）
 
@@ -244,8 +244,27 @@ xas_error():   xa_err(xas->xa_node)
 
 然后我们把这个含义扩展一下
 
-  * shift代表我们存储的这个范围最后落在的node的shift
-  * sibs代表这个范围在node上，会有多少兄弟(**减1**)
+  * xa_shift代表我们存储的这个范围最后落在的node的shift
+  * xa_sibs代表这个范围在node上，会有多少兄弟(**减1**)
+
+补充：2026.3.5
+
+好久没有看了，再看的时候完全不知道在说什么了。让我再尝试解释一下，以便日后再看不会那么迷茫。
+
+上面这个含义扩展是比较准的，就是
+
+  * xa_shift: 表示存储的时候，最后落在的那个xa_node的shift是多少
+  * xa_sibs:  表示要表达这个range，在xa_node上需要占用多少个slot(减1)，其实是siblings的意思
+
+然后我们再来展开计算过程来理解一下。
+
+  * order - (order % XA_CHUNK_SHIFT)
+    - 这个计算和 order / XA_CHUNK_SHIFT * XA_CHUNK_SHIFT 等价
+    - 意思是order是多少倍的XA_CHUNK_SHIFT,
+    - 这样就知道要表达这个order的range，xa_node的xa_shift需要多少才够
+  * (1U << (order % XA_CHUNK_SHIFT)) - 1
+    - 这个就是处理order中剩下的bit，依次来计算在xa_node中需要占用多少slot
+    - 然后这里再减1,得到的是有多少sibling的值
 
 ### 举个例子
 
