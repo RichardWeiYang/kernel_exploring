@@ -45,8 +45,7 @@
 
 对于文件映射，这个值表示vma区域的起始地址对应的内容在在文件中的偏移。这个值在mmap时，由用户指定。
 
-而对匿名映射，这个值通常就是vma起始地址右移PAGE_OFFSET。参见do_mmap(), pgoff =
-addr >> PAGE_SHIFT.
+而对匿名映射，这个值通常就是vma起始地址右移PAGE_OFFSET。参见do_mmap(), pgoff = vm_start >> PAGE_SHIFT.
 
 # 相关的系统调用
 
