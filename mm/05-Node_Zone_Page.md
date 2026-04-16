@@ -175,7 +175,8 @@ free_area_init()
 free_area_init()
     arch_zone_lowest_possible_pfn[]
     arch_zone_highest_possible_pfn[]
-    find_zone_movable_pfns_for_nodes();              // 根据配置计算ZONE_MOVABLE的边界
+
+    find_zone_movable_pfns_for_nodes();              // 根据配置计算每个节点ZONE_MOVABLE的边界
 
     free_area_init_node(nid)
         calculate_node_totalpages()
@@ -185,18 +186,44 @@ free_area_init()
     ...
 ```
 
-## 开启ZONE_MOVABLE的方式
+## 什么要有ZONE_MOVABLE
+
+如果说其他zone的存在是因为物理访问的限制，比如某些设备只能访问32位以内的内存，所以划分了ZONE_DMA32，那ZONE_MOVABLE则更多是软件上的。
+
+可以看ZONE_MOVABLE的注释：
+
+> ZONE_MOVABLE is similar to ZONE_NORMAL, except that it contains
+>  movable pages with few exceptional cases described below. Main use
+>  cases for ZONE_MOVABLE are to make memory offlining/unplug more
+>  likely to succeed, and to locally limit unmovable allocations
+
+所以ZONE_MOVABLE没有硬性的边界，其边界是人为可以调整，并且在启动时计算出来的。
+
+## 计算ZONE_MOVABLE的边界
 
 默认情况下我们看不到这个zone的存在，有下面几种方式可以开启：
 
-* movable_node
-* kernelcore=50%
+  * movablecore
+  * kernelcore
 
-其实都是在内核命令行里加参数，具体可以看函数find_zone_movable_pfns_for_nodes()。全都在里面了。
+这两者是正反两面，我们只看kernelcore。
+
+使用kernelcore有三种参数方式：
+
+  * kernelcore=512M     # 512MB
+  * kernelcore=20%      # 总内存的20%
+  * kernelcore=mirror
+
+其大致意思就是希望至少留多少空间给kernel，这部分因为是kernel用，所以我不希望它热插拔。然后剩下的部分呢，拿去做movable就好。
+
+根据这个参数，find_zone_movable_pfns_for_nodes()会计算出对每个numa节点的边界.
+
 
 # 思考题
 
 每个page作为链表元素链接在了free_list上，那page数据结构本身放在哪里呢？你猜的到吗？
+
+这涉及到两个内核命令行参数的使用： kernelcore/movable。
 
 
 [1]: https://www.kernel.org/doc/gorman/html/understand/understand005.html
