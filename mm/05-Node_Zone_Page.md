@@ -175,24 +175,150 @@ free_area_init()
 free_area_init()
     arch_zone_lowest_possible_pfn[]
     arch_zone_highest_possible_pfn[]
-    find_zone_movable_pfns_for_nodes();              // 根据配置计算ZONE_MOVABLE的边界
+
+    find_zone_movable_pfns_for_nodes();              // 根据配置计算每个节点ZONE_MOVABLE的边界
+        find_usable_zone_for_movable();              // 选定最后一个有空间的zone作为候选
+            movable_zone = zone_index;
+        计算每个节点上movable_zone中需要预留的空间   // 就是在选定的movable_zone中，扣一块出来
+
+    // 打印Zone ranges
+
+    // 打印zone_movable_pfn[]
 
     free_area_init_node(nid)
         calculate_node_totalpages()
-            zone_spanned_pages_in_node()
-                adjust_zone_range_for_zone_movable() // 根据movable zone调整其他zone的边界
+            zone_spanned_pages_in_node()             // 计算zone的真实边界
+                adjust_zone_range_for_zone_movable() // 根据zone_movable_pfn调整zone的边界
+            zone_absent_pages_in_node()              // 计算zone范围中的空缺：包括hole以及movable/normal之间的重叠部分
 
+    memmap_init()
+        memmap_init_zone_range()
     ...
 ```
 
-## 开启ZONE_MOVABLE的方式
+## 为什么要有ZONE_MOVABLE
+
+如果说其他zone的存在是因为物理访问的限制，比如某些设备只能访问32位以内的内存，所以划分了ZONE_DMA32，那ZONE_MOVABLE则更多是软件上的。
+
+可以看ZONE_MOVABLE的注释：
+
+> ZONE_MOVABLE is similar to ZONE_NORMAL, except that it contains
+>  movable pages with few exceptional cases described below. Main use
+>  cases for ZONE_MOVABLE are to make memory offlining/unplug more
+>  likely to succeed, and to locally limit unmovable allocations
+
+所以ZONE_MOVABLE没有硬性的边界，其边界是人为可以调整，并且在启动时计算出来的。
+
+## 计算ZONE_MOVABLE的边界
 
 默认情况下我们看不到这个zone的存在，有下面几种方式可以开启：
 
-* movable_node
-* kernelcore=50%
+  * movablecore
+  * kernelcore
 
-其实都是在内核命令行里加参数，具体可以看函数find_zone_movable_pfns_for_nodes()。全都在里面了。
+这两者是正反两面，我们只看kernelcore。
+
+使用kernelcore有三种参数方式：
+
+  * kernelcore=512M     # 512MB
+  * kernelcore=20%      # 总内存的20%
+  * kernelcore=mirror
+
+其大致意思就是希望至少留多少空间给kernel，这部分因为是kernel用，所以我不希望它热插拔。然后剩下的部分呢，拿去做movable就好。
+
+根据这个参数，find_zone_movable_pfns_for_nodes()会计算出对每个numa节点的边界.
+
+  * 如果没有设置参数，或者要求的kernelcore大于所有内存，则不会进行计算
+  * movable_zone只会在最后一个zone，find_usable_zone_for_movable
+  * 根据kernelcore平均计算出每个节点上预留的大小kernelcore_node.
+  * 每个节点上预留kernelcore_node，并计算出zone_movable_pfn[nid]
+
+然后，这个计算出的zone_movable_pfn会在adjust_zone_range_for_zone_movable()时使用。
+
+  * ZONE_MOVABLE: 因为是软件计算出来的，所以zone_start_pfn就是zone_movable_pfn[nid]
+                  而zone_end_pfn就是movable_zone的最大值
+  * 非ZONE_MOVABLE且!mirrored_kernelcore: 如果当前的这段区域和zone_movable_pfn[nid]
+                  重叠，则切分
+
+## 调整ZONE_MOVABLE的边界
+
+很有意思的是，我发现find_zone_movable_pfns_for_nodes()完成后，内核打印Zone ranges和Movable zone start for each node的时候，实际上movable zone的区域还没有落到实处。
+
+因为内核此时输出的日志限制，zone normal还是原来的范围。
+
+```
+ Zone ranges:
+   DMA      [mem 0x0000000000001000-0x0000000000ffffff]
+   DMA32    [mem 0x0000000001000000-0x00000000ffffffff]
+   Normal   [mem 0x0000000100000000-0x00000001bfffffff]
+   Device   empty
+ Movable zone start for each node
+   Node 1: 0x0000000100000000
+```
+
+真正让zone movalbe出现的，还要依赖函数adjust_zone_range_for_zone_movable()。
+
+```
+static void __init adjust_zone_range_for_zone_movable(int nid,
+					unsigned long zone_type,
+					unsigned long node_end_pfn,
+					unsigned long *zone_start_pfn,
+					unsigned long *zone_end_pfn)
+{
+	/* Only adjust if ZONE_MOVABLE is on this node */
+	if (zone_movable_pfn[nid]) {
+		/* Size ZONE_MOVABLE */
+		if (zone_type == ZONE_MOVABLE) {
+			*zone_start_pfn = zone_movable_pfn[nid];
+			*zone_end_pfn = min(node_end_pfn,
+				arch_zone_highest_possible_pfn[movable_zone]);
+
+		/* Adjust for ZONE_MOVABLE starting within this range */
+		} else if (!mirrored_kernelcore &&
+			*zone_start_pfn < zone_movable_pfn[nid] &&
+			*zone_end_pfn > zone_movable_pfn[nid]) {
+			*zone_end_pfn = zone_movable_pfn[nid];
+
+		/* Check if this whole range is within ZONE_MOVABLE */
+		} else if (*zone_start_pfn >= zone_movable_pfn[nid])
+			*zone_start_pfn = *zone_end_pfn;
+	}
+}
+```
+
+到这里，zone movable的区域才算是真的出现了。而被挖掉一块的zone，也剔除了被占用的部分。
+
+## mirrored_kernelcore
+
+之前我们看到kernelcore命令行参数有三种方式，其中最后一种mirror和前两者的处理不同。
+
+当我们指定内核命令行参数kernelcore=mirror后，就会设置mirrored_kernelcore为true。这样在find_zone_movable_pfns_for_nodes()中就会特殊处理。
+
+但是有意思的是，这个命令行选项还要配合memblock_has_mirror()使用。
+
+```
+cmdline_parse_kernelcore()
+    parse_option_str(p, "mirror")
+        mirrored_kernelcore = true
+
+start_kernel()
+    setup_arch()
+        efi_find_mirror()
+            memblock_mark_mirror(start, size)                // 根据硬件属性标记镜像内存区域
+                system_has_some_mirror = true;
+                memblock_setclr_flag(&memblock.memory, ... , MEMBLOCK_MIRROR)
+
+    mm_core_init_early()
+        free_area_init()
+            find_zone_movable_pfns_for_nodes
+                if (mirrored_kernelcore) {
+                    zone_movable_pfn[] 设定为非镜像内存的最小值
+		}
+```
+
+这里计算zone_movable_pfn时，就变成了取节点上非镜像内存的最小值。
+
+但是这样的话，最后通过adjust_zone_range_for_zone_movable()调整，得到实际的zone边界。我觉得这意味着硬件标识的mirror区域也是在低zone范围内的.
 
 # 思考题
 
