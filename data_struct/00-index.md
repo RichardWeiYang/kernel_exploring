@@ -18,6 +18,8 @@
 
 [Interval Tree][7]
 
+[Static Key][9]
+
 [1]: /data_struct/01-list.md
 [2]: /data_struct/03-plist.md
 [3]: /data_struct/02-hlist.md
@@ -26,3 +28,4 @@
 [6]: /data_struct/06-maple_tree.md
 [7]: /data_struct/07-interval_tree.md
 [8]: /data_struct/static_pcpu.md
+[9]: /data_struct/09-static_key.md
