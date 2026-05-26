@@ -20,6 +20,8 @@
 
 [Static Key][9]
 
+[list_lru][10]
+
 [1]: /data_struct/01-list.md
 [2]: /data_struct/03-plist.md
 [3]: /data_struct/02-hlist.md
@@ -29,3 +31,4 @@
 [7]: /data_struct/07-interval_tree.md
 [8]: /data_struct/static_pcpu.md
 [9]: /data_struct/09-static_key.md
+[10]: /data_struct/10-list_lru.md

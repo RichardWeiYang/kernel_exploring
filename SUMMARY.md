@@ -163,6 +163,7 @@
     * [Xarray vs Maple Tree](data_struct/08-xarray_vs_maple_tree.md)
   * [Interval Tree](data_struct/07-interval_tree.md)
   * [Static Key](data_struct/09-static_key.md)
+  * [list_lru](data_struct/10-list_lru.md)
 * [Tools](tools/handy_tools.md)
   * [发补丁](tools/01-patch.md)
   * [检查文件变化](tools/02-check_file_change.md)
