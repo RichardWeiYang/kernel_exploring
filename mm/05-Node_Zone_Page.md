@@ -320,6 +320,29 @@ start_kernel()
 
 但是这样的话，最后通过adjust_zone_range_for_zone_movable()调整，得到实际的zone边界。我觉得这意味着硬件标识的mirror区域也是在低zone范围内的.
 
+# ZONE_DEVICE
+
+ZONE_DEVICE内存比较特殊，在系统启动的过程中并没有这部分内存，而是借助了热插拔的代码在后面添加进系统的。主要的接口是devm_memremap_pages()。
+
+其中值的注意的是，设备内存还分为几种类型，
+
+    * MEMORY_DEVICE_PRIVATE
+    * MEMORY_DEVICE_COHERENT
+    * MEMORY_DEVICE_FS_DAX
+    * MEMORY_DEVICE_GENERIC
+    * MEMORY_DEVICE_PCI_P2PDMA
+
+其中MEMORY_DEVICE_PRIVATE这个类型，CPU不能直接访问，所以也没有建立内核页表的映射，但是有page struct。 而且也是通过move_pfn_range_to_zone()，“移动”到Zone Device并初始化每一个page。
+
+但是有意思的是，pagemap_range()还会再用memmap_init_zone_device()再初始化一次？
+
+其实不是的，而是分了两个阶段来初始化
+
+    * memmap_init_range(): 初始化位于头部的必要部分
+    * memmap_init_zone_device(): 初始化剩下的部分
+
+但是这部分page struct并没有放到buddy allocator中,且设为为保留状态，__SetPageReserved。
+
 # 思考题
 
 每个page作为链表元素链接在了free_list上，那page数据结构本身放在哪里呢？你猜的到吗？
