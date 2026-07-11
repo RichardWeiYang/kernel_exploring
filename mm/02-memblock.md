@@ -105,6 +105,7 @@ start_kernel()
                     sparse_usage_init()              // 分配usage空间，包含subsection和pageblock
                     __populate_section_memmap()      // 拿到mmep，也就是当前section的struct page的内存
                     sparse_init_early_section()      // struct page设置到mem_section->section_mem_map，usage设置到usage(包括pageblock)
+                sparse_init_subsection_map()         // 初始化subsection_map
             zone_size_init()
                 free_area_init()                     // 初始化pgdat
                     free_area_init_node()            // call for each pgdat

@@ -3,7 +3,6 @@
   * pageblock
   * migratetype
 
-
 在这里我们好好研究一下。
 
 # 相关数据结构
@@ -35,7 +34,20 @@ pageblock的定义是在mem_section中。
                                         +----+----+----+---...---+----+----+
 ```
 
-可以看到，pageblock是粒度比在section小的一个概念。（而且从大小上看，不能比buddy allocator中的MAX_ORDER要大，最多持平，参见isolate_single_pageblock的注释）
+可以看到，pageblock是粒度比在section小的一个概念。
+
+而且从大小上看，不能比buddy allocator中的MAX_PAGE_ORDER要大，最多持平，参见isolate_single_pageblock的注释
+
+```
+/*
+ * The MAX_PAGE_ORDER, which defines the max order of pages to be allocated
+ * by the buddy allocator, has to be larger or equal to the PAGE_BLOCK_MAX_ORDER,
+ * which defines the order for the number of pages that can have a migrate type
+ */
+#if (PAGE_BLOCK_MAX_ORDER > MAX_PAGE_ORDER)
+#error MAX_PAGE_ORDER must be >= PAGE_BLOCK_MAX_ORDER
+#endif
+```
 
 再看一眼，实际上整个mem_section_usage定义的时候是一个指针，所以相关的存储空间是在初始化时，动态分派的。sparse_init_nid()。
 其中pageblock的空间是个另一个usage中的成员一起分配的，sparse_usage_init()。其中计算mem_section_usage大小的函数是mem_section_usage_size()。
@@ -90,6 +102,8 @@ NR_PAGEBLOCK_BITS是根据pageblock_bits的定义来的
   * 如果没有定义CONFIG_MEMORY_ISOLATION，得出的结果是4
   * 如果定义了CONFIG_MEMORY_ISOLATION，得出的结果是8
 
+总结： **给每PAGE_BLOCK_MAX_ORDER个页面分配了4或者8比特，来标注这块内存（默认4M）的migratetype**。
+
 ## migratetype
 
 migratetype和buddy allocator的关系更紧密一些。
@@ -97,7 +111,7 @@ migratetype和buddy allocator的关系更紧密一些。
 ```
       struct zone
       +------------------------------+      The buddy system
-      |free_area[MAX_ORDER]  0...10  |
+      |free_area[NR_PAGE_ORDERS]     |  [0...10]: [0, MAX_PAGE_ORDER]
       |   (struct free_area)         |
       |   +--------------------------+
       |   |nr_free                   |  number of available pages
@@ -251,6 +265,26 @@ enum pageblock_bits {                                                          e
                                                                                #endif
                                                                                	MIGRATE_TYPES
                                                                                };
+```
+
+用这个图来尝试解释，也就是pageblock的低三位对应着migratetype。而最高两位是特殊设置，需特殊处理。
+
+```
+   4      3     2     1     0      total NR_PAGEBLOCK_BITS = 8
+   +-----+-----+-----+-----+-----+
+   |     |     |     |     |     |
+   |     |     |     |     |     |
+   +-----+-----+-----+-----+-----+
+      |     |     |     |     |
+      |     |     |     |     +---
+      |     |     |     |          \
+      |     |     |     +---------   = enum migratetype
+      |     |     |                /
+      |     |     +---------------
+      |     |
+      |     +---------------------  migrate_skip
+      |
+      +---------------------------  migrate_isolate
 ```
 
 另外，为了防止后面有人误操作，在migratetype中新增加类型导致pageblock中放不下，还在get_pfnblock_bitmap_bitidx()中增加了编译时报错.

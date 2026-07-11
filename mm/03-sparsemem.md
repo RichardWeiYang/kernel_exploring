@@ -251,29 +251,33 @@ struct mem_section mem_section[NR_SECTION_ROOTS][SECTIONS_PER_ROOT]
 
 好了，这个SPARSEMEM就讲到这里～我想大家已经知道page结构体是在什么地方的了～
 
-# 全局顺序
+# 初始化流程
 
 最后来看一下启动时sparsemem代码执行顺序。
 
 ```
     start_kernel()
         setup_arch()
-            e820__memblock_setup()
-            init_mem_mapping()
-            initmem_init()
             x86_init.paging.pagetable_init() -> paging_init()
                 sparse_init()
                     memblock_present()                 mark section present
-                    sparse_init_nid()                  setup section's memmap/usermap
+                    sparse_init_nid()                  setup section's section_mem_map/usage
+                        sparse_init_early_section()
+                    sparse_init_subsection_map()       setup section's usage->subsection_map
                 node_clear_state(0, N_MEMORY);
                 node_clear_state(0, N_NORMAL_MEMORY)
-                zone_sizes_init()                      init pgdat
 ```
 
-简单来说分了两步：
+简单来说分了三步：
 
-* 标注哪些section是存在的
-* 给存在的section分配memmap/usermap
+  * 标注哪些section是存在的
+  * 给存在的section分配memmap/usermap
+  * 标记subsection: **目前标记subsection时，如果subsection中只有部分内存，也会标记存在**
+
+memblock_present()标记了present的section，肯定有内存在。但其中可能有空缺。
+sparse_init_nid()会遍历所有标记了present的section, 并设置好对应section上的section_mem_map/usage。
+sparse_init_subsection_map()又重新扫描了一遍section，目的是标记usage->subsection_map。subsection的大小是2M， (SUBSECTION_SHIFT 21)。
+
 
 # 常用API
 

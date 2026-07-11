@@ -13,10 +13,12 @@
               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  slub         | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | |
               +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                                            
- page         |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |                                            
+ page(buddy)  |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |                                            
               +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
  page_block   |       |       |       |       |       |       |       |       |
-              +-------+-------+-------+-------+-------+-------+-------+-------+
+              +===+===+===+===+===+===+===+===+===+===+===+===+===+===+===+===+
+ subsection   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |
+              +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
  mem_section  |               |               |               |               |
               +---------------+---------------+---------------+---------------+
  memory_block |                               |                               |
@@ -27,12 +29,40 @@
               +---------------------------------------------------------------+
 ```
 
-从这张图中我们可以看到，为了管理好内存，内核开发者将整个内存分成了不同的层次不同的粒度来管理。其中page和slub已经有很多文章来解读，而e820, memblock和mem_section在前面的章节中已有描述，本章就不在赘述。这里我们着重看看通常被忽略的两个粒度：
+从这张图中我们可以看到，为了管理好内存，内核开发者将整个内存分成了不同的层次不同的粒度来管理。
 
-  * memory_block
-  * pageblock
+究竟这几个粒度在系统中起到什么作用，以及之间的关系,让我们来一探究竟。
 
-究竟这两个粒度在系统中起到什么作用呢？让我们来一探究竟。
+另外值的注意的是，有些层次有管理单元的最小大小, 因为大小的重叠可能会有些潜在问题。这里记录一下大小，便于后续查找：
+
+  * page: 最大有MAX_PAGE_ORDER, 必须 >= PAGE_BLOCK_MAX_ORDER
+  * page_block: 根据配置不同而不同，比如是HPAGE_PMD_ORDER和PAGE_BLOCK_MAX_ORDER的最小值。默认是2^10个页大小，算4M
+  * subsection: 2M, (SUBSECTION_SHIFT 21)
+  * mem_section:  x86上是128M, (SECTION_SIZE_BITS	27)
+  * memory_block: 最小是一个mem_section, (MIN_MEMORY_BLOCK_SIZE)
+
+# 粒度单位的分水岭
+
+在上面几个粒度层次划分中，有一个非常重要的分水岭 -- **page_block**。
+
+  * 往上：划分单位是页的数目，通常是 2的多少次方页
+  * 往下：划分单位是原始内存大小，比如MB
+
+所以这里有个麻烦的地方，比如subsection定义的是2M，默认配置情况，也就是4K页大小，page_block大小是4M。
+
+但是如果页大小配置为64K，那page_block大小就是64M。也就会夸更多个subsection，这样对某些情况下的校验，提出了更高的要求。
+
+# e820
+
+e820是x86影响平台上报内存布局的硬件，对软件处理来说，我们几乎可以忽略这部分。
+
+这部分在[e820][2]有详细介绍。
+
+# memblock
+
+memblock是第一层软件对硬件上报内存布局的抽象，大部分情况我们在系统运行起来后，也不太接触到这个。
+
+这部分在[memblock][3]有详细介绍。
 
 # memory_block
 
@@ -99,120 +129,42 @@ static struct bus_type memory_subsys = {
 
 我把它老人家放在这里了，我想你能才到上线时触发到了谁吧～
 
-# pageblock
+# mem_section
 
-对pageblock的使用小编暂时还不是特别理解，主要的用途之一和内存迁移相关。这里我们先从原理上理解pageblock的作用，至于用途等到小编后续学习了之后再来讲解。
+mem_section在[寻找页结构体][4]中做了比较详细的描述。
 
-## pageblock的位置
+值得注意的是，subsection/pageblock的定义也在mem_section中。都位于mem_section.usage中。
 
-pageblock这个概念其实有点尴尬，因为它不像其他的内存粒度有一个非常明确的结构体来表达。对pageblock的描述只是一个挂在mem_section结构体上的位图(bitmap)。
+  * subsection_map
+  * pageblock_flags
 
-多说无益，来张图看看：
-
-```
-     mem_section
-     +-----------------------------+
-     |section_mem_map              |
-     |   (unsigned long)           |
-     |                             |
-     +-----------------------------+
-     |usage                        |
-     |   (mem_section_usage *)     |
-     |   +-------------------------+
-     |   |subsection_map           |
-     |   |    (bitmap)             |
-     |   |                         |
-     |   |                         |
-     |   |                         |
-     |   |pageblock_flags[0]       |    [(1UL << (PFN_SECTION_SHIFT - pageblock_order))]
-     |   |    (unsigned long)   ---|--->+----+----+----+---...---+----+----+
-     +---+-------------------------+    |    |    |    |         |    |    |
-                                        |    |    |    |         |    |    |
-                                        +----+----+----+---...---+----+----+
-```
-
-从上图中可以看到，在每个mem_section结构体上用一个pageblock_flags的位图，来表示对应物理内存的属性。
-
-为了节省空间（小编猜的），并不是给每一个页分配对应的属性，而是每pageblock_order个页共用一个pageblock属性。这个pageblock_order有几种不同的可能性，其中一种就是buddy分配器上的最大页面值。
+而这两者在管理粒度上有着重要的差异：
 
 ```
-#define pageblock_order		(MAX_ORDER-1)
+    subsection            |          pageblock
+    ===================================================
+    静态                  | 动态
+    ----------------------+----------------------------
+    划分单位为MB          | 划分单位为page_number
+    ---------------------------------------------------
 ```
 
-从这个角度看，pageblock的粒度就是 MAX_ORDER个页。
+## subsection
 
-## pageblock的定义
+subsection在sparse_init()中初始化完成，并通过sparse_init_subsection_map()标记了存在的内存后，就不会再变化了。
 
-上面我们看到了pageblock是一个位图，那这个位图上究竟定义的是什么，每一位代表什么意义？
+有一点值得注意的是，subsection_mask_set()过程中，是允许有空缺的。
 
-待小编画个草图给看官瞧一瞧：
+## pageblock
 
-```
-    3     2     1     0      total NR_PAGEBLOCK_BITS = 4
-   +-----+-----+-----+-----+
-   |     |     |     |     |
-   |     |     |     |     |
-   +-----+-----+-----+-----+
-      |     |     |     |
-      |     |     |     +---
-      |     |     |          \
-      |     |     +---------   = enum migratetype
-      |     |                /
-      |     +---------------
-      |
-      +---------------------  migrate_skip
-```
+但是pageblock则会在运行中根据状态变化，并且其状态是跟随者再上层的page变化的。所以它的划分单位是页的个数。这样导致了pageblock所包含的subsection个数在不同配置中不是一个固定值。
 
-也就是每个pageblock_order页面都有4bit的位图来表示其属性。其中最高位有点特殊，表示一个特殊含义。而后三位则是一个枚举类型migratetype。其可能的值定义为：
+通常情况下，pageblock的大小是2^10个页面大小，也就是4M。可以包含两个subsection。
 
-```
-    enum migratetype {
-    	MIGRATE_UNMOVABLE,
-    	MIGRATE_MOVABLE,
-    	MIGRATE_RECLAIMABLE,
-    	MIGRATE_PCPTYPES,	/* the number of types on the pcp lists */
-    	MIGRATE_HIGHATOMIC = MIGRATE_PCPTYPES,
-    #ifdef CONFIG_CMA
-    	MIGRATE_CMA,
-    #endif
-    #ifdef CONFIG_MEMORY_ISOLATION
-    	MIGRATE_ISOLATE,	/* can't allocate from here */
-    #endif
-    	MIGRATE_TYPES
-    };
-```
-
-嗯，是啥意思咱先不管了，至少看出来是怎么定义的。
-
-在继续阅读代码之前，小编先出道题考一考大家。代码中有这么一段定义，大家能理解为什么要这么写么？
-
-```
-BUILD_BUG_ON(MIGRATE_TYPES > (1 << PB_migratetype_bits));
-```
-
-## pageblock的使用
-
-说了这么一堆，定义了这么个位图，那究竟是怎么使用呢？嗯，其中的奥妙就要联系到buddy分配器了。在这里小编只讲解与pageblock相关的部分，其他的细节还请读者们自行网上搜索相关资料～
-
-这其中的奥秘啊还要从free_area说起，小编将free_area中的相关部分摘取出来。
-
-```
-      +------------------------------+
-      |free_area[MAX_ORDER]  0...11  |
-      |   (struct free_area)         |
-      |   +--------------------------+
-      |   |free_list[MIGRATE_TYPES]  |
-      |   |(struct list_head)        |
-      +---+--------------------------+
-```
-
-所以我们之前看到的free_area->free_list其实不止一个链表，而是每个migrate_type一个链表。当我们去分配内存时，不仅要看大小上的匹配，还要看migrate_type的匹配。
-
-当然，为了减少内存碎片，当我们找不到内存时，还可以在不同的migrate_type上去搜索。只是这个搜索还是有一定规则的，也不是阿猫阿狗都能用不同类型的空闲内存。
-
-小编在这里只给出一个方向，具体的代码就留给各位想要进一步学习的读者自行探索啦～
-
-  * find_suitable_fallback()
-  * fallbacks[MIGRATE_TYPES]
+这部分在[pageblock和migrationtype][5]中有详细描述。
 
 [1]: /mm/03-sparsemem.md
+[2]: /mm/01-e820_retrieve_memory_from_HW.md
+[3]: /mm/02-memblock.md
+[4]: /mm/03-sparsemem.md
+[5]: /mm/15-pageblock_migratetype.md
