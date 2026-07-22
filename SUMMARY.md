@@ -53,6 +53,7 @@
       * [延迟初始化](mm/54-defer_init.md)
       * [内存热插拔](mm/53-memory_hotplug.md)
       * [连续内存分配器](mm/55-cma.md)
+      * [内存规整](mm/56-compaction.md)
   * [虚拟内存空间](virtual_mm/00-index.md)
     * [页表和缺页中断](virtual_mm/03-page_table_fault.md)
       * [匿名和文件缺页中断](virtual_mm/16-pf_anon_file.md)
