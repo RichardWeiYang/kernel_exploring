@@ -153,16 +153,64 @@ cma=256M@0x80000000      # 指定起始地址，要对齐 PAGE_SIZE
 
 ## 分配
 
+当系统中真的需要连续内存是，会调用cma_alloc()去获取内存。这个过程有点意思，值得好好看一下。
+
 ```
-  cma_alloc(cma, count, align, )
+  cma_alloc(cma, count, align, )                              // 注意：这个count可以不是pageblock对齐的
       page = cma_alloc_frozen(cma, count, align, ) -> __cma_alloc_frozen(cma, count, align, GFP_KERNEL)
-          cma_range_alloc(cma, &cma->ranges[], count, align, &page)
-              bitmap_find_next_zero_area_off()                // 找出一段连续的空闲bitmap
+          cma_range_alloc(cma, &cma->ranges[], count, align, &pagep)
+              bitmap_no = bitmap_find_next_zero_area_off()    // 找出一段连续的空闲bitmap
               bitmap_set(bitmap, bitmap_no, bitmap_count)     // 标记为已分配
+              pfn = cmr->base_pfn + (bitmap_no << cma->order_per_bit)
+              page = pfn_to_page(pfn)                         // 得到连续空间的起始page
 
 
-              alloc_contig_frozen_range(pfn, pfn + count, )
+              // 此时，[pfn, pfn + count)这段区域在系统中可能已经被使用
+              // alloc_contig_frozen_range的作用就是隔离这块区域，并迁移走上面的内容
+              alloc_contig_frozen_range(pfn, pfn + count, ) -> alloc_contig_frozen_range_noprof(pfn, pfn + count, )
+
+              *pagep = page
       set_pages_refcounted(page, count)                       // 每一个page都设置为1
+```
+
+因为alloc_contig_frozen_range()的罗杰有点复杂，所以单独拿出来分析。
+
+```
+  // [start, end) 不一定pageblock对齐
+  alloc_contig_frozen_range_noprof(start, end, )
+      cc->alloc_contig = true
+
+      // 标记为MIGRATE_ISOLATE, 这部分区域的内存后续free之后就会放到这个链表，不会被再分配
+      // 注：只能改变原来类型为MIGRATE_MOVABLE和MIGRATE_CMA的
+      start_isolate_page_range(start, ,end, mode)
+          // 因为[start, end)不一定是对齐的，所以先对齐到pageblock
+          isolate_start = pageblock_start_pfn(start_pfn)
+          isolate_end = pageblock_align(end_pfn)
+
+
+          // 当MAX_PAGE_ORDER>PAGE_BLOCK_MAX_ORDER时，会出现freepage跨pageblock的情况
+          // 所以首位pageblock需要特殊处理。参考isolate_single_pageblock注释
+          isolate_single_pageblock(isolate_start, mode, false, skip_isolation/*= false*/)
+          skip_isolation = true, if (isolate_start = isolate_end - pageblock_nr_pages)
+          isolate_single_pageblock(isolate_end, mode, true, skip_isolation)
+
+          // 再隔离中间的pageblock
+          set_migratetype_isolate()                                // 会将跨pageblock的buddy page拆分
+                                                                   // 使用中的page不做处理
+
+      __alloc_contig_migrate_range(&&cc, start, ,end)
+          isolate_migratepages_range(cc, start, end)
+              isolate_migratepages_block(cc, start, end)           // 把在lruvec上的页摘下来，放到cc->migratepages上
+          migrate_pages(&cc->migratepages, )                       // 将使用中的页迁移走
+
+
+      outer_start = find_large_buddy(start)
+
+      // 确认完全隔离
+      test_pages_isolated(outer_start, end, )
+          __test_page_isolated_in_pageblock(outer_start, end, )
+
+      outer_end = isolate_freepages_range(&cc, outer_start, end)
 ```
 
 # 例子 & 测试
