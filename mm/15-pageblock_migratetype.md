@@ -323,3 +323,66 @@ free_one_page(zone, page, pfn, order, )
         __free_one_page(page, pfn, zone, order, mt)
             __add_to_free_list(page, zone, order, mt, )       // 最后存放到指定的order，指定的migratetype上
 ```
+
+# 和isolate相关的函数调用关系
+
+这件事情还得从pageblock_pfn_to_page()说起，为了[社区][1]中对这个函数的优化，梳理了一下这里的关系。不知道放哪里好，就先存在这儿。
+
+如果但从pageblock_pfn_to_page()的调用这看，一共是五个：
+
+  * isolate_migratepages_range
+  * isolate_freepages_range
+  * isolate_migratepages
+  * isolate_freepages
+  * fast_isolate_freepages
+  * fast_isolate_around
+
+但是，fast_isolate_freepages和fast_isolate_around都指向单一的调用者isolate_freepages。所以一合计只有两对调用者：
+
+  * isolate_migratepages_range/isolate_freepages_range
+  * isolate_migratepages/isolate_freepages
+
+而他们各自对应两个使用的场景：
+
+  * alloc_contig_frozen_range_noprof -- [cma][2]的情况
+  * compact_zone -- [内存规整][3]的情况
+
+在这里我们做一个对比，详细的调用流程看对应的小节。
+
+## alloc_contig_frozen_range_noprof
+
+```
+alloc_contig_frozen_range_noprof(start, end, )
+    start_isolate_page_range(start, end)                           // 标记pageblock为MIGRATE_ISOLATE
+    __alloc_contig_migrate_range(&&cc, start, ,end)
+        isolate_migratepages_range(cc, start, end)
+            pageblock_pfn_to_page(start, end, )
+            isolate_migratepages_block(cc, start, end)             // 把在lruvec上的页摘下来，放到cc->migratepages上
+        migrate_pages(&cc->migratepages, )                         // 将使用中的页迁移走
+
+    outer_end = isolate_freepages_range(&cc, outer_start, end)
+        pageblock_pfn_to_page(start, end, )
+        isolate_freepages_block(start, end, strict/*=true*/)       // 把在PageBuddy上的页摘下来，放到cc->freepages上
+```
+
+## compact_zone
+
+```
+compact_zone()
+    isolate_migratepages(cc)
+        pageblock_pfn_to_page()
+        isolate_migratepages_block(cc, )                           // 把在lruvec上的页摘下来，放到cc->migratepages上
+
+    migrate_pages(&cc->migratepages, compaction_alloc, compaction_free, )
+        compaction_alloc() -> compaction_alloc_noprof()
+            isolate_freepages(cc)
+                pageblock_pfn_to_page()
+                isolate_freepages_block(.., strict/*=false*/)      // 把在PageBuddy上的页摘下来，放到cc->freepages上
+```
+
+
+[1]: https://lore.kernel.org/all/20260408031615.1831922-1-yuan1.liu@intel.com/T/#u
+[2]: /mm/55-cma.md
+[3]: /mm/56-compaction.md
+
+
