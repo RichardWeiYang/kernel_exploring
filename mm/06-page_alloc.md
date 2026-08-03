@@ -213,25 +213,27 @@ __find_buddy_index(unsigned long page_idx, unsigned int order)
 
 那最后释放到哪里了呢？
 
-对了，就是zone->free_area[order].free_list上了。
+对了，就是zone->free_area[order].free_list[migratetype]上了。所以这么看，真正的核心还要看**__add_to_free_list()**。
 
-## 各种释放接口
+而__add_to_free_list()函数只有三个调用方：
 
-内核中有很多释放内存的地方，这里我们总结一下。
+  * __free_one_page()   -- page释放的核心入口
+  * expand()            -- 辅助函数
+  * add_to_free_list()  -- memory-failure专用
 
-* __free_pages_core，这是将内存从memblock/hotplug时，加入到buddy system
-* 核心 __free_one_page，最后都要通过这个函数将内存放到free_list上
-* free_one_page 这个和__free_one_page的差别就是拿了zone的锁，大部分实际会走这里
-* __free_pages_ok/free_unref_page/free_unref_folio, 在free_one_page前调用free_pages_prepare()
-* __free_pages/put_page/folio_put, 先减去引用计数，再调用free_unref_[page|folio]
+前两者一个是用在memory failure中，隔离poisoned page的； 一个是用在分配过程中，将大order page切分成小order的。
+所以总体来说，核心还是 __free_one_page()。
 
-### __free_pages_core
+__free_one_page()的调用者有四个：
 
-这是个比较特殊的接口，从memblock/hotplug来的内存通过这个接口释放到buddy system。
+  * split_large_buddy()            -- page正常释放的核心
+  * free_pcppages_bulk()           -- pcp相关
+  * __putback_isolated_page()      -- isolate过程中的辅助函数
+  * put_page_back_buddy()          -- memory-failure专用
 
-### __free_one_page流程
+## 释放页的核心接口__free_one_page()
 
-这个是最内存的释放函数了，基本所有的page都是靠他释放到free_list上的。
+__free_one_page() 这个是最核心的内存释放函数了，基本所有的page都是靠他释放到free_list上的。
 
 ```c
 __free_one_page(page, pfn, zone, order, migratetype, fpi_flags)
@@ -256,22 +258,82 @@ done_merging:
     add_to_free_list[_tail](page, zone, order, migratetype)       // 添加到free_list上
 ```
 
-### free_one_page
 
-这个和__free_one_page的差别在与持锁操作
+## 常见释放接口及其关系
 
-### __free_pages_ok/free_unref_[page|foio]
+```
+  free_pages_exact(addr, size)                    free_contig_frozen_range(pfn, nr_pages)                  free_contig_range(pfn, nr_pages)
+             | paired with                                |        \                                                      |
+             |   alloc_pages_exact()                      |         \                                                     |
+             v                                            |          \                                                    |
+  free_page(addr)                                         |           \ non-compound pages                                | only non-compound pages
+             |                                            |            \                                                  |
+             |                                            |             v                                                 v
+             v                folio_put(folio)            |      __free_contig_frozen_range(pfn, nr_pages)    __free_contig_range(pfn, nr_pages)
+ free_pages(addr, order)      folio_put_refs(folio, refs) |               \                                    /
+             |                        |                   |                +--+                +--------------+
+             |                        |                   |                    \              /
+             |                        |                   |                     +--+   +-----+
+             |                        |                   |                         \ /
+             v                        v                   | compound pages           v
+ __free_pages(page, order)    __folio_put(folio)          |               __free_contig_range_common(pfn, nr_pages)
+             |                        \                   |                          |
+             | paired with             \                 /                           |  free_pages_prepare() -> __free_pages_prepare()
+             |    alloc_pages()         \              /                             |
+             v                           v           v                               v
+ ___free_pages(page, order, )      free_frozen_pages(page, order)         free_prepared_contig_range(page, nr_pages, )
+           \                                  |                                  /
+            \ put_page_testzero(page)         |                                 /
+             \                                |                                /
+              +-------------+                 |                +--------------+
+                             \                |                /
+                              +-----------+   |   +-----------+
+                                           \  |  /
+                                              v
+                                  __free_frozen_pages(page, order, )
+                                              |
+                                              |
+ __free_pages_core(page, order, )             |                           批量操作的优化
+              |                               |                                |
+              | mem_init, hotonline           | may put on                     |
+              v                               |   pcplist                      v
+ __free_pages_ok(page, order, )               |                        free_unref_folios(folios)
+              \                               |                               /
+               \                              |                              /
+                 +-------------------------   |   --------------------------+
+                                           \  |  /
+                                            \ | /   all would call __free_pages_prepare(page, order, )
+                                             \|/
+                                              v
+                                  free_one_page(zone, page, pfn, order, )
+                                              |
+                                              | spin_lock(&zone->lock)
+                                              v
+                                  split_large_buddy(zone, page, pfn, order, )
+                                              |
+                                              | 拆分成pageblock释放
+                                              v
+                                       __free_one_page()            add_to_free_list()
+                                              \                       /
+                                               +---+            +----+
+                                                    \           / account_freepages()
+                                                     +--+   +--+
+                                                         \ /
+                                                          v
+                                      __add_to_free_list(page, zone, order, mt, tail)
+```
 
-在free_one_page前，调用了free_pages_prepare()
+没想到page的释放衍生出来这么多变种。先列着吧，等需要的时候再来看，希望用得上。
 
-### __free_pages/put_page
 
-这两个都是先减去引用计数，再调用free_unref_page。
-这两者有细微的差别，具体可以看__free_pages的注释。
+## __free_pages_prepare(page, order, )
+
+所有释放回page alloc的页都要经过__free_pages_prepare()，做预处理和检查。
+
 
 # 分配页
 
-## 分配页的核心接口
+## 分配页的核心接口__alloc_frozen_pages_noprof()
 
 页分配的核心函数是__alloc_frozen_pages_noprof()。正如函数的注释上写的"This is the 'heart' of the zoned buddy allocator."。
 
@@ -434,6 +496,115 @@ Node Fallback list
   * b93e0f329e24 2017-09-06 mm, memory_hotplug: get rid of zonelists_mutex
 
 从历史记录来看，最开始是有锁的。到现在其实把锁去掉了。
+
+## 常见分配接口及其关系
+
+分配相关接口实在太多了，分成两部分介绍。
+
+第一部分是不带mempolicy的。所以这部分，要么nodemask是NULL，要么有其他方式指定了nodemask。按照我的理解，这部分应当主要是分配内核内存。
+
+```
+                                                                          alloc_charge_folio()            __folio_alloc_node()
+                                                                          alloc_migration_target()                 |
+                                                                                   |                               |
+                                                                                   |                               |
+                                                                                   v                               v
+  alloc_pages_node(nid,         alloc_pages_exact_nid_noprof(nid,        __folio_alloc(gfp, order,       __folio_alloc_node_noprof(gfp, order,
+         \         gfp, order)             /                 size, gfp)           \    nid, nodemask)               /              nid)
+          \                               /                                        \                               /
+           \                             /                                          \                             /
+            \                           /                                            \                           /
+             \                         /                                              \                         /
+              +------+   +------------+                                                +---------+   +---------+
+                      \ /                                                                         \ /
+                       v                                                                           v
+         alloc_pages_node_noprof(nid,                                       __folio_alloc_noprof(gfp, order, nid, nodemask)
+                  \              gfp, order)                                       /
+                   \                                                              / add __GFP_COMP
+                    \                        __alloc_pages(gfp, order,           /  return page_rmappable_folio(page)
+                     \                                   | nid, nodemask, )     /
+                      \                                  |                     /
+                       \                                 |                    /
+                        +-----------------------------+  |  +----------------+
+                                                       \ | /
+                                                        \|/
+                                                         v
+                  __alloc_frozen_pages()     __alloc_pages_noprof(gfp, order, nid, nodemask, )
+                                       \       /
+                                        \     /    no mpol, or nodemask is given
+                                         \   /       from migration or khugepaged
+                                          \ /      set_page_refcounted(page)
+                                           v
+                               __alloc_frozen_pages_noprof(gfp, order, nid, nodemask, )
+                                 page = get_page_from_freelist()
+                                   prep_new_page(page, order, )
+                                     prep_compound_page(page, order), if (gfp_flags & __GFP_COMP)
+                                 return page, refount is 0
+```
+
+第二部分是带mempolicy的。按照我的理解，这部分主要是用户态分配内存使用。alloc_pages_mpol()分配出的page是不设置refcount的。这点从名字上看不出。
+
+```
+                           folio_alloc(gfp, order)       alloc_pages(gfp, order)
+                                     |                           |          get_zeroed_page_noprof(gfp)
+                                     v                           |          __get_free_pages(gfp, order)
+                            folio_alloc_noprof(gfp, order)       |               |
+                                \                                |          get_free_pages_noprof(gfp, order)   pagetable_alloc_noprof(gfp, order)
+                                 \ add __GFP_COMP                |              /                                   /
+                                  \return page_rmappable_folio   |             /  return page_address(page)        / return page_ptdesc(page)
+          alloc_slab_page()        \                             |            /                                   /
+                 |                  +----------------------------+   +-------+-----------------------------------+
+                 |                                                \ /
+                 v                                                 v
+       alloc_frozen_pages(gfp, order)                   alloc_pages_noprof(gfp, order)
+                 \                                             /
+                  \                                           / set_page_refcounted(page)
+                   +------------------+   +------------------+
+                                       \ /
+                                        v
+                              alloc_frozen_pages_noprof(gfp, order)
+                                         \
+                                          \  pol = &default_policy
+                                           \ pol = get_task_polity(current)
+                                            \
+                                             \
+                                              \               folio_alloc_mpol()  vma_alloc_folio_noprof(gfp, order, vma, addr)
+                                               \                         \           /
+                                                \                         \   +-----+   pol = get_vma_policy(vma, addr, order, &ilx)
+                                                 \                         \ /
+                                                  \                         v
+                                                   \             folio_alloc_mpol_noprof(gfp, order, pol, , nid)
+                                                    \                  / add __GFP_COMP
+                                                     \                /  set_page_refcounted(page)
+                                                      \              /   return page_rmappable_folio(page)
+                                                       +------+     /
+                                                               \   /
+                                                                \ /
+                                                                 v
+                                      alloc_pages_mpol(gfp, order, pol, NO_INTERLEAVE_INDEX, numa_node_id())
+                                                /      |
+                                               /       | nodemask = policy_nodemask(gfp, pol, , )
+                     alloc_pages_preferred_many()      |
+                                               \       |
+                                                \      |
+                                                 v     v
+                                      __alloc_frozen_pages_noprof(gfp, order, nid, nodemask, ALLOC_DEFAULT)
+```
+
+其中可以看出, 分配出来是folio的，都带上了__GFP_COMP标识。但是如果分配出的是page，则不一定带有 __GFP_COMP标识。
+
+alloc_pages_bulk_noprof() 分配一个数组的order-0页面，这个接口的效果看上去和alloc_pages() + split_page()相当。但是前者分配的page和后者的区别是：
+
+  * 大概率不是连续的
+  * 直接从pcp链表上取
+  * 可以是任意nr_pages, 而不一定是2^order
+
+alloc_pages_exact_nid_noprof()也有类似的作用, 但是这个变体和alloc_pages() + __split_page()区别是：
+
+  * 可以是任意nr_pages, 不一定是2^order
+
+所以看上取是alloc_pages_bulk_noprof()和 alloc_pages() + split_page()的中间态。
+
 
 # 引用计数
 
