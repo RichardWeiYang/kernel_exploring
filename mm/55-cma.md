@@ -221,6 +221,12 @@ cma=256M@0x80000000      # 指定起始地址，要对齐 PAGE_SIZE
       __free_contig_frozen_range()                                 // 释放掉多分配的
 ```
 
+上面的流程中，我们可以看到alloc_contig_frozen_range_noprof()中使用了[isolate相关函数][2]中提到的一组api。
+
+  * isolate_migratepages_range() / isolate_freepages_range()
+
+而且这两个函数作用的物理地址范围是一样的[start, end],这一点和[compaction][3]不一样。
+
 ## 释放
 
 # 例子 & 测试
@@ -244,3 +250,5 @@ cat used    # 当前被占用的页面数
 ```
 
 [1]: /mm/02-memblock.md
+[2]: /mm/15-pageblock_migratetype.md
+[3]: /mm/56-compaction.md

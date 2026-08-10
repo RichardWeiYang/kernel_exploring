@@ -49,3 +49,12 @@ Zone 低地址 (low_pfn)                                               Zone 高�
 	                 3. migrate_pages()
                          (把数据 Copy 过去)
 ```
+
+上面的流程中，我们可以看到alloc_contig_frozen_range_noprof()中使用了[isolate相关函数][1]中提到的一组api。
+
+  * isolate_migratepages() / isolate_freepages()
+
+而且这两个函数作用的物理地址范围是不一样的: 一个是在zone的前段，一个是在zone的后段,这一点和[cma][2]不一样。
+
+[1]: /mm/15-pageblock_migratetype.md
+[2]: /mm/55-cma.md

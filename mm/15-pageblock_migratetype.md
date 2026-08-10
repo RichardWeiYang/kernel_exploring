@@ -353,6 +353,11 @@ free_one_page(zone, page, pfn, order, )
 
 ```
 alloc_contig_frozen_range_noprof(start, end, )
+    cc.alloc_contig = true                                         // 区别于compact_zone()
+    cc.ignore_skip_hint = true
+    cc.no_set_skip_hint = true
+    cc.mode = MIGRATE_SYNC
+
     start_isolate_page_range(start, end)                           // 标记pageblock为MIGRATE_ISOLATE
     __alloc_contig_migrate_range(&&cc, start, ,end)
         isolate_migratepages_range(cc, start, end)
@@ -363,16 +368,20 @@ alloc_contig_frozen_range_noprof(start, end, )
     outer_end = isolate_freepages_range(&cc, outer_start, end)
         pageblock_pfn_to_page(start, end, )
         isolate_freepages_block(start, end, strict/*=true*/)       // 把在PageBuddy上的页摘下来，放到cc->freepages上
+                                                                   // 此时page应该都在free_list[MIGRATE_ISOLATE]列表上
 ```
 
 ## compact_zone
 
 ```
 compact_zone()
+
+    // 扫描的区域是从前往后扫描
     isolate_migratepages(cc)
         pageblock_pfn_to_page()
         isolate_migratepages_block(cc, )                           // 把在lruvec上的页摘下来，放到cc->migratepages上
 
+    // 扫描的区域是从后往前扫描
     migrate_pages(&cc->migratepages, compaction_alloc, compaction_free, )
         compaction_alloc() -> compaction_alloc_noprof()
             isolate_freepages(cc)
@@ -380,6 +389,14 @@ compact_zone()
                 isolate_freepages_block(.., strict/*=false*/)      // 把在PageBuddy上的页摘下来，放到cc->freepages上
 ```
 
+值得注意的是虽然我们在外层拆分出了两组api
+
+  * isolate_migratepages_range/isolate_freepages_range
+  * isolate_migratepages/isolate_freepages
+
+但是往里仔细看最后执行的api是同一组
+
+  * **isolate_freepages_block / isolate_migratepages_block**
 
 [1]: https://lore.kernel.org/all/20260408031615.1831922-1-yuan1.liu@intel.com/T/#u
 [2]: /mm/55-cma.md
