@@ -52,6 +52,41 @@
 
 但是如果页大小配置为64K，那page_block大小就是64M。也就会夸更多个subsection，这样对某些情况下的校验，提出了更高的要求。
 
+# 各个粒度之间大小的制约关系
+
+总体来说，粒度从下往上是越来越精细。但正因为粒度单位从大小变成了页，为了避免出问题，内核中做了制约。
+
+## page <-> section
+
+```
+#if (MAX_PAGE_ORDER + PAGE_SHIFT) > SECTION_SIZE_BITS
+#error Allocator MAX_PAGE_ORDER exceeds SECTION_SIZE
+#endif
+```
+
+在一个section中，必须能分配出任意的buddy。也就是在buddy上的page，不可能跨两个section.
+
+## page <-> pageblock
+
+```
+#if (PAGE_BLOCK_MAX_ORDER > MAX_PAGE_ORDER)
+#error MAX_PAGE_ORDER must be >= PAGE_BLOCK_MAX_ORDER
+#endif
+```
+
+最大可分配的页面，不能比pageblock小。这有时候会引入一个问题，某个page的migratetype是由多个pageblock对应的migratetype表达的。
+
+## pageblock <-> section
+
+结合上面两点：
+
+  * 最大的page不能超过section
+  * pageblock不能超过最大的page
+
+得出：
+
+  pageblock也不能超过section
+
 # e820
 
 e820是x86影响平台上报内存布局的硬件，对软件处理来说，我们几乎可以忽略这部分。
