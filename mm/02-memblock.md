@@ -98,6 +98,8 @@ start_kernel()
         dma_contiguous_reserve(max_pfn_mapped..)     // 给dma分好cma区域,好像把所有的内存都包近来了
 
         x86_init.paging.pagetable_init() -> paging_init()
+        e820__reserve_resources()
+            insert_resource(&iomem_resource, res)    // 注册到/proc/iomem中
 
     mm_core_init_early()
         free_area_init()                             // 初始化pgdat

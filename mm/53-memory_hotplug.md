@@ -1,5 +1,30 @@
 本小节我们将来看看内存热插拔的一些流程。
 
+# IOMEM中的占位
+
+整个地址空间不仅用于内存，还有其他的用途，比如pci地址空间。这个信息被记录在iomem_resource数据中，可以通过/proc/iomem文件来查看。
+
+在x86平台上， 内存空间是在 e820__reserve_resources() -> insert_resource(&iomem_resource, res) 过程中注册到/proc/iomem中的。
+
+在热插拔过程中，当然也要检测对应插入的物理地址空间是合理的。
+
+```
+__add_memory
+    res = register_memory_resource(start, end, "System RAM")
+    add_memory_resource(nid, res, )
+```
+
+当热插入一块内存后，/proc/iomem就会显示出这部分区域
+
+```
+100000000-1bfffffff : System RAM
+  12ce00000-12dda4de7 : Kernel code
+  12de00000-12e3edfff : Kernel rodata
+  12e400000-12e7ece3f : Kernel data
+  12ec16000-12effffff : Kernel bss
+1c0000000-1ffffffff : System RAM                 // 热插入的部分
+```
+
 # 热插的总体流程
 
 我们先来看一下热插拔的总体流程：
