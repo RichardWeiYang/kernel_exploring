@@ -266,31 +266,31 @@ done_merging:
              | paired with                                |        \                                                      |
              |   alloc_pages_exact()                      |         \                                                     |
              v                                            |          \                                                    |
-  free_page(addr)                                         |           \ non-compound pages                                | only non-compound pages
-             |                                            |            \                                                  |
+  free_page(addr)                                         | compound  \ non-compound pages                                | only non-compound pages
+             |                                            | pages      \                                                  |
              |                                            |             v                                                 v
              v                folio_put(folio)            |      __free_contig_frozen_range(pfn, nr_pages)    __free_contig_range(pfn, nr_pages)
  free_pages(addr, order)      folio_put_refs(folio, refs) |               \                                    /
-             |                        |                   |                +--+                +--------------+
-             |                        |                   |                    \              /
-             |                        |                   |                     +--+   +-----+
+             |                        |                   |                \  is_frozen = true                / is_frozen = false
+             |                        |                   |                 \                                /
+             |                        |                   |                  +-----+   +--------------------+
              |                        |                   |                         \ /
-             v                        v                   | compound pages           v
- __free_pages(page, order)    __folio_put(folio)          |               __free_contig_range_common(pfn, nr_pages)
+             v                        v                   |                          v
+ __free_pages(page, order)    __folio_put(folio)          |               __free_contig_range_common(pfn, nr_pages, is_frozen)
              |                        \                   |                          |
              | paired with             \                 /                           |  free_pages_prepare() -> __free_pages_prepare()
              |    alloc_pages()         \              /                             |
              v                           v           v                               v
- ___free_pages(page, order, )      free_frozen_pages(page, order)         free_prepared_contig_range(page, nr_pages, )
+ ___free_pages(page, order, )      free_frozen_pages(page, order)         free_prepared_contig_range(page, nr_pages)
            \                                  |                                  /
-            \ put_page_testzero(page)         |                                 /
-             \                                |                                /
+            \ put_page_testzero(page)         |                                 / fpi_flags = FPI_PREPARED
+             \                                |                                /     skip __free_pages_prepare() below
               +-------------+                 |                +--------------+
                              \                |                /
                               +-----------+   |   +-----------+
                                            \  |  /
                                               v
-                                  __free_frozen_pages(page, order, )
+                                  __free_frozen_pages(page, order, fpi_flags)
                                               |
                                               |
  __free_pages_core(page, order, )             |                           批量操作的优化
