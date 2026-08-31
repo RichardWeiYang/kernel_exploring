@@ -16,6 +16,9 @@
     |   (struct file*)               |
     |vm_pgoff                        |    offset in PAGE_SIZE
     |   (unsigned long)              |
+    |__vm_anon_pgoff_lo              |
+    |__vm_anon_pgoff_hi              |
+    |   (unsigned int)               |
     +--------------------------------+
     |vm_flags                        |    VM_READ/WRITE/EXEC
     |   (unsigned long)              |
@@ -39,13 +42,61 @@
 
 代表了这个vma在进程虚拟空间中的岂止地址。
 
-## vm_pgoff
+## vm_pgoff 和 vm_anon_pgoff
 
 这个pgoff的单位是页，也就是在线性地址的基础上右移PAGE_SHIFT。
 
-对于文件映射，这个值表示vma区域的起始地址对应的内容在在文件中的偏移。这个值在mmap时，由用户指定。
+对于文件映射，这个值表示vma区域的起始地址对应的内容在在文件中的偏移。这个值在mmap时，作为最后一个参数由用户指定。(而对于匿名映射,这个参数应当指定为0。)
 
-而对匿名映射，这个值通常就是vma起始地址右移PAGE_OFFSET。参见do_mmap(), pgoff = vm_start >> PAGE_SHIFT.
+而对匿名映射，这个值有两种情况：
+
+  * MAP_PRIVATE : addr >> PAGE_SHIFT
+  * MAP_SHARED  : 0
+
+参见do_mmap(). 而这个addr就是vma->vm_start。
+
+所以在MAP_PRIVATE时，匿名vma->vm_pgoff就是对应进程中所在的虚拟地址。(如果不发生remap)
+在MAP_SHARED时，因为此时是新创建的一个shmem文件，所以从0开始就行了。
+
+vm_anon_pgoff 是由两个成员组成的：  __vm_anon_pgoff_lo/__vm_anon_pgoff_hi的设置
+
+这是新引入的一个标识，是为了保持vma中信息的一致性。从上面的例子看出，vm_pgoff对于匿名页的两种不同映射会有不同的含义。为了统一增加了这个field。
+
+确保这个值在两种不同的映射下都是 addr >> PAGE_SHIFT.
+
+最后通过vma_set_anon_pgoff()设置，但我看实际上文件映射和匿名映射都能设置这个字段。
+
+## vma_start_anon_pgoff(vma) / vma_start_pgoff(vma)
+
+这两个是对应上面的vm_anon_pgoff和vm_pgoff的, 也就是获得vma在对应**地址空间偏移**。
+
+设置完后，将通过这两个接口获得vma对应偏移。
+
+一般来说，获取vma对应映射的偏移，只要用vma_start_pgoff()就行了。
+
+当MAP_FILE | MAP_PRIVATE时，只有对CoW后的页，需要使用vma_start_anon_pgoff()来获取新的私有匿名页的偏移。
+
+而当MAP_ANONYMOUS | MAP_PRIVATE时，这两个api获得的值是一样的。
+
+## vma_anon_address(vma, pgoff, nr_pages) / vma_filebacked_address()
+
+也由此分别有针对文件和匿名映射vma中某个偏移对应到进程中**虚拟地址**的函数。
+
+上面两组api是相关的。 这个要从mmap的四种组合说起：
+
+  * MAP_FILE | MAP_SHARED
+  * MAP_FILE | MAP_PRIVATE
+  * MAP_ANONYMOUS | MAP_SHARED
+  * MAP_ANONYMOUS | MAP_PRIVATE
+
+其中前三个都是文件映射（共享匿名映射实际由一个文件支持），所以这三种情况都使用vma_filebacked_address()计算虚拟地址。
+最有一种， 匿名私有映射，是使用vma_anon_address()。
+
+但是第二种情况，私有文件映射，当发生CoW后，对应地址的页面就变成了匿名页面，此时就需要用vma_anon_address()了。
+
+这是为了统一匿名页（注意：不是匿名映射）在反向映射查找过程中的偏移。
+
+这两个接口中的第二个参数，是一个偏移量。它是怎么来的呢？这个问题要到[folio->index][6]才能解开。
 
 # 相关的系统调用
 
@@ -553,3 +604,4 @@ PS：要在当前目录上打开，因为依赖plot.js这个文件。
 [3]: https://lwn.net/Articles/937943
 [4]: https://github.com/antonblanchard/will-it-scale
 [5]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/arch/x86/x86_64/mm.rst
+[6]: /virtual_mm/21-folio_index.md
