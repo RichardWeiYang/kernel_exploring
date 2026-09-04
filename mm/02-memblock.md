@@ -76,6 +76,9 @@ start_kernel()
     setup_arch()
         e820__memory_setup()
             max_pfn = e820__end_of_ram_pfn()
+
+        parse_early_param()
+
         memblock_set_current_limit(ISA_END_ADDRESS)
         e820__memblock_setup()
             memblock_add()
@@ -125,6 +128,8 @@ start_kernel()
                     init_pageblock_migratetype()     // 设置默认migratetype为MIGRATE_MOVABLE
             init_unavailable_range()                 // 初始化空洞
 
+    parse_early_param()
+
     mm_core_init()
         build_all_zonelists(NULL)                    // 构造page allocator的zonelist
         memblock_free_all()                          // 将内存释放到buddy
@@ -147,10 +152,9 @@ start_kernel()
                     deferred_init_memmap()           // 延迟初始化 page struct，并释放到buddy
                     memblock_discard()               // discard region array
                 do_basic_setup()
-                    do_initcalls()
-                        cma_init_reserved_areas()    // 释放cma到buddy
-                    init_per_zone_wmark_min()
-                        setup_per_zone_wmarks()      // 初始化wmark
+                    do_initcalls() -> do_initcall_level()
+                        parse_args()                 // 解析命令行参数
+                        cma_init_reserved_areas()    // 释放cma到buddy (core_initcall)
             free_initmem()
                 free_kernel_image_pages()            // 释放__init标记的，在__init_begin/end之间的内存
 ```
