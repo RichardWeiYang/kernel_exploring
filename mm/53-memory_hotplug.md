@@ -210,6 +210,12 @@ memory_block_offline
 
         scan_movable_pages(pfn, end_pfn, &pfn)
         do_migrate_range(pfn, end_pfn)
+            page = pfn_to_page(pfn)
+            folio = page_folio(page)
+            folio_try_get(folio)  // 获取一个引用计数
+            isolate_folio_to_list(folio, &source)
+
+            migrate_pages(&source, alloc_migration_target, )
 
         test_pages_isolated(start_pfn, end_pfn, PB_ISOLATE_MODE_MEM_OFFLINE)   // 确认[start_pfn, end_pfn)所有页面都是free的，且mt是MIGRATE_ISOLATE
 
