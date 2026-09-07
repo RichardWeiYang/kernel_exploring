@@ -27,7 +27,7 @@ __add_memory
 
 # 热插的总体流程
 
-我们先来看一下热插拔的总体流程：
+我们先来看一下热插的总体流程：
 
 ```
 add_memory_resource()
@@ -183,6 +183,49 @@ Node 0, zone  Movable
 
 这样就意味着zone_contiguous会被打破。
 
+# 热拔的总体流程
+
+热拔也分成两部分：
+
+  * 下线: offline_pages()
+  * 删除: arch_remove_memory()
+
+热拔这部分我们主要看热下线offline部分：
+
+```
+memory_block_offline
+    mem_hotplug_begin()
+
+    adjust_present_page_count()
+
+    offline_pages(start_pfn, nr_pages, mem->zone, mem->group)
+	zone_pcp_disable(zone)
+            __zone_set_pageset_high_and_batch(zone, 0,0,1)                     // 关掉zone->pcplist
+            __drain_all_pages(zone, true)                                      // 把pcplist上的页放到buddy, 并标记Buddy
+        lru_cache_disable()                                                    // 清空per-cpu lru batch, 保证都标记lru
+
+        // 将对应pageblock设置为MIGRATE_ISOLATE
+        // 并将free的页面放到对应freelist
+        start_isolate_page_range(start_pfn, end_pfn, PB_ISOLATE_MODE_MEM_OFFLINE)
+
+        scan_movable_pages(pfn, end_pfn, &pfn)
+        do_migrate_range(pfn, end_pfn)
+
+        test_pages_isolated(start_pfn, end_pfn, PB_ISOLATE_MODE_MEM_OFFLINE)   // 确认[start_pfn, end_pfn)所有页面都是free的，且mt是MIGRATE_ISOLATE
+
+
+        __offline_isolated_pages(start_pfn, end_pfn)
+
+        lru_cache_enable();
+        zone_pcp_enable(zone);
+
+        remove_pfn_range_from_zone(zone, start_pfn, nr_pages);                 // 更新zone的span范围
+
+    mhp_deinit_memmap_on_memory(start_pfn, nr_vmemmap_pages)                   // 如果有nr_vmemmap_pages的话，也释放这部分内存
+
+    mem_hotplug_done()
+```
+
 # 利用qemu测试内存热插
 
 这功能还好有虚拟机，否则真是不好测试。
@@ -218,7 +261,7 @@ qemu-system-x86_64 -m 6G,slots=32,maxmem=32G -smp 8 --enable-kvm  -nographic \
 
 可以通过numactl -H和free -h来确认当前内存。
 
-## 热插内存
+## 热插内存(memory_block方式)
 
 启动完后，需要使用qemu monitor来插入内存。
 
