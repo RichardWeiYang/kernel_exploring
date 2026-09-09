@@ -76,14 +76,20 @@ hot-add的意义在于给对应的内存分配page struct，也就是有了内�
 __add_pages(nid, pfn, nr_pages)
      sparse_add_section(nid, pfn, pfns, altmap)
          sparse_index_init(section_nr,  nid)
-         memmap = section_activate(nid, pfn, nr_pages, altmap)
-             fill_subsection_map(pfn, nr_pages)
+         memmap = section_activate(nid, pfn, nr_pages, altmap)                 // memmap就是page struct对应的内存
+             fill_subsection_map(pfn, nr_pages)                                // 标记subsection
              memmap = populate_section_memmap(pfn, nr_pages, nid, altmap)
+                 page = __populate_section_memmap(pfn, nr_pages, )
+                     start = pfn_to_page(pfn)
+                     vmemmap_populate(start, ) -> vmemmap_populate_basepages(start, )
+                         vmemmap_pte_populate()                                // page从这里分配出来，并设置页表
+                     return pfn_to_page(pfn)
+                 memmap_pages_add(section_nr_vmemmap_pages(pfn, nr_pages, ))
+                 return page
          page_init_poison()
-         set_section_nid(section_nr, nid)
          section_mark_present(ms)
          sparse_init_one_section(ms, section_nr, memmap, ms->usage, 0)
-             ms->section_mem_map |= sparse_encode_mem_map(memmap, pnum)
+             ms->section_mem_map |= sparse_encode_mem_map(memmap, pnum)        // memmap设置到section_mem_map中
 ```
 
 总的来说中规中矩，就是添加了对应的mem_section和memmap，也就是page struct。
@@ -119,6 +125,7 @@ memory_block_online(mem)
             generic_online_page()
                 __free_pages_core()                --- (2)
                     __ClearPageOffline()
+            // 标记SECTION_IS_ONLINE
             online_mem_sections()
         adjust_present_page_count()
         build_all_zonelists(NULL)                  --- (3)
@@ -190,6 +197,8 @@ Node 0, zone  Movable
   * 下线: offline_pages()
   * 删除: arch_remove_memory()
 
+## hot-offline
+
 热拔这部分我们主要看热下线offline部分：
 
 ```
@@ -199,7 +208,7 @@ memory_block_offline
     adjust_present_page_count()
 
     offline_pages(start_pfn, nr_pages, mem->zone, mem->group)
-	zone_pcp_disable(zone)
+        zone_pcp_disable(zone)
             __zone_set_pageset_high_and_batch(zone, 0,0,1)                     // 关掉zone->pcplist
             __drain_all_pages(zone, true)                                      // 把pcplist上的页放到buddy, 并标记Buddy
         lru_cache_disable()                                                    // 清空per-cpu lru batch, 保证都标记lru
@@ -221,15 +230,34 @@ memory_block_offline
 
 
         __offline_isolated_pages(start_pfn, end_pfn)
+            offline_mem_sections()                                             // 清除SECTION_IS_ONLINE标志，和online_mem_sections()对应
+            del_page_from_free_list(page, zone, order, MIGRATE_ISOLATE)        // 从freelist上移除，虽然已经在MIGRATE_ISOLATE上了
 
         lru_cache_enable();
         zone_pcp_enable(zone);
 
+        adjust_managed_page_count(pfn_to_page(start_pfn), -managed_pages);
+        adjust_present_page_count(pfn_to_page(start_pfn), group, -nr_pages);
         remove_pfn_range_from_zone(zone, start_pfn, nr_pages);                 // 更新zone的span范围
 
     mhp_deinit_memmap_on_memory(start_pfn, nr_vmemmap_pages)                   // 如果有nr_vmemmap_pages的话，也释放这部分内存
+        offline_mem_sections()
+        remove_pfn_range_from_zone()
 
     mem_hotplug_done()
+```
+
+## hot-remove
+
+```
+arch_remove_memory() -> __remove_pages(start_pfn, nr_pages, altmap, pgmap)
+    sparse_remove_section()
+        section_deactivate()
+            clear_subsection_map(pfn, nr_pages)                                // 清除subsection标志, 和fill_subsection_map()对应
+            depopulate_section_memmap(pfn, nr_pages, )
+                start = pfn_to_page(pfn)
+                vmemmap_free(start, end, ) -> remove_pagetable(start, end, ...)
+                    free_vmemmap_pages()                                       // 释放page struct内存
 ```
 
 # 利用qemu测试内存热插
