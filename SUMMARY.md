@@ -38,6 +38,7 @@
         * [Compound Page](mm/page_allocator/01-compound_page.md)
         * [Folio](mm/14-folio.md)
       * [Node-Zone-Page](mm/05-Node_Zone_Page.md)
+        * [Zone Device](mm/58-zone_device.md)
         * [内存管理的不同粒度](mm/13-physical-layer-partition.md)
       * [传说的伙伴系统](mm/06-page_alloc.md)
       * [GFP的功效](mm/12-gfp_usage.md)
