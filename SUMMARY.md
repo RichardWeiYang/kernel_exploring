@@ -79,6 +79,7 @@
     * [HugeTLB](hugetlb/00-index.md)
       * [使用方式](hugetlb/01-usage.md)
       * [映射和缺页](hugetlb/02-mmap_fault.md)
+      * [初始化](hugetlb/03-init_hugetlb.md)
     * [NUMA策略](virtual_mm/07-mempolicy.md)
     * [numa balance](virtual_mm/08-numa_balance.md)
     * [统计数据](virtual_mm/14-statistics.md)

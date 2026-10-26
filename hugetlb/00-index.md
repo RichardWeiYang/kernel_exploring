@@ -4,5 +4,8 @@ HugeTLB是一个神奇的存在，工业界好像用得还挺多的。
 
 然后我们沿着用法中的例子，看看内核是[如何映射并发生缺页的][2]。
 
+在观察的过程中，发现hugetlb使用中时有一定的特殊之处，它有特别的[初始化][3]过程。
+
 [1]: /hugetlb/01-usage.md
 [2]: /hugetlb/02-mmap_fault.md
+[3]: /hugetlb/03-init_hugetlb.md
