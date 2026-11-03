@@ -84,7 +84,7 @@ start_kernel()
             memblock_add()
                 memblock_add_range(&memblock.memory, base, size, MAX_NUMNODES, 0)
             memblock_dump_all()
-        init_mem_mapping()                           // 设置内核页表(direct mapping)
+        init_mem_mapping()                                         // 设置内核页表(direct mapping)
             end = max_pfn << PAGE_SHIFT;
             memory_map_bottom_up(kernel_end, end);
                 max_pfn_mapped = max(max_pfn_mapped, end_pfn)
@@ -94,69 +94,90 @@ start_kernel()
             memblock_set_node(0, ULLONG_MAX, &memblock.memory, MAX_NUMNODES) // 默认都先归到node MAX_NUMNODES
             memblock_set_node(0, ULLONG_MAX, &memblock.reserved, MAX_NUMNODES)
             numa_register_memblks()
-                memblock_set_node()                  // 再根据numa信息设置真实的node
-                alloc_node_data(nid)                 // allocate pgdata for each node with memory
-                    node_set_online(nid)             // 因为只有有内存的node才会分配，所以这里online的都是有内存的
+                memblock_set_node()                                // 再根据numa信息设置真实的node
+                alloc_node_data(nid)                               // allocate pgdata for each node with memory
+                    node_set_online(nid)                           // 因为只有有内存的node才会分配，所以这里online的都是有内存的
 
-        dma_contiguous_reserve(max_pfn_mapped..)     // 给dma分好cma区域,好像把所有的内存都包近来了
+        dma_contiguous_reserve(max_pfn_mapped..)                   // 给dma分好cma区域,好像把所有的内存都包近来了
 
         x86_init.paging.pagetable_init() -> paging_init()
         e820__reserve_resources()
-            insert_resource(&iomem_resource, res)    // 注册到/proc/iomem中
+            insert_resource(&iomem_resource, res)                  // 注册到/proc/iomem中
 
     mm_core_init_early()
-        free_area_init()                             // 初始化pgdat
-            arch_zone_limits_init()                  // 划分Zone范围
-            free_area_init_node()                    // call for each pgdat
+        // mem_section初步初始化: 标记early和online
+        sparse_sections_init()
+            // for_each_mem_pfn_range()                            // 给标记有内存的区域，初始化mem_section
+            sparse_index_init()
+
+        // 主要是划分了每个node中的zone
+        free_area_init()                                           // 初始化pgdat
+            arch_zone_limits_init()                                // 划分Zone范围
+            free_area_init_node()                                  // call for each pgdat
                 get_pfn_range_for_nid(nid, &start_pfn, &end_pfn)
                 calculate_node_totalpages(pgdat, start_pfn, end_pfn)
                 free_area_init_core(pgdat)
-            node_set_state(nid, N_MEMORY)            // 存在可用内存的节点标上MEMORY
+            node_set_state(nid, N_MEMORY)                          // 存在可用内存的节点标上MEMORY
 
+        hugetlb_cma_reserve()
+        hugetlb_bootmem_alloc()
+
+        // mem_setcion元数据初始化: 包括分配page struct
         sparse_init()
-            memblock_presents()
-                memory_present()                     // 分配mem_section，并标记present
-            sparse_init_nid()
-                sparse_usage_init()                  // 分配usage空间，包含subsection和pageblock
-                __populate_section_memmap()          // 拿到mmep，也就是当前section的struct page的内存
-                sparse_init_early_section()          // struct page设置到mem_section->section_mem_map，usage设置到usage(包括pageblock)
-            sparse_init_subsection_map()             // 初始化subsection_map
+            sparse_metadata_init()
+                // for_each_early_section_nr()                     // 只遍历early section
+                sparse_metadata_init_nid()
+                    sparse_usage_init()                            // 分配usage空间，包含subsection和pageblock
+                    __populate_section_memmap()                    // 拿到mmep，也就是当前section的struct page的内存
+                    sparse_init_one_section()                      // struct page设置到mem_section->section_mem_map，usage设置到usage(包括pageblock)
+            sparse_init_subsection_map()                           // 初始化subsection_map, 标记存在的内存
 
-        memmap_init()->memmap_init_zone_range()      // 遍历每一个memblock range,调用memmap_init_zone_range()
-            memmap_init_range()                      // 将[start, end]初始化到node/zone
-                defer_init()                         // 对应的page延后初始化
-                    init_pageblock_migratetype()     // 设置默认migratetype为MIGRATE_MOVABLE
-            init_unavailable_range()                 // 初始化空洞
+        // 初始化page struct
+        memmap_init()
+            // for_each_mem_pfn_range()                            // 给标记有内存的区域，初始化page struct, 包括空洞和预留空间
+            memmap_init_zone_range()
+                memmap_init_range()                                    // 将[start, end]初始化到node/zone
+                    defer_init()                                       // 对应的page延后初始化
+                        init_pageblock_migratetype()                   // 设置默认migratetype为MIGRATE_MOVABLE
+                init_unavailable_range()                               // 初始化空洞, PS: 这里没有延迟初始化
 
     parse_early_param()
 
     mm_core_init()
-        build_all_zonelists(NULL)                    // 构造page allocator的zonelist
-        memblock_free_all()                          // 将内存释放到buddy
+        build_all_zonelists(NULL)                                  // 构造page allocator的zonelist
+        memblock_free_all()                                        // 将内存释放到buddy
+            free_unused_memmap()
+
             reset_all_zones_managed_pages()
+
             free_low_memory_core_early()
-                memmap_init_reserved_pages()         // 设置PageReserved
-                    memblock_set_node()              // 全量设置memblock.reserved中的nid信息
-                    reserve_bootmem_region()         // 初始化预留页的page（不受defer_init影响）
-                __free_memory_core(start, end)       // release free pages to buddy
-                    memblock_free_pages( , order)    //
-                        early_page_initialised(pfn)  // 如果设置了defer init，则会推迟释放
-                        __free_pages_core()          // 真释放
+                memmap_init_reserved_pages()                       // 设置PageReserved
+                    // for_each_mem_region()
+                    memblock_set_node()                            // 全量设置memblock.reserved中的nid信息
+                    // for_each_reserved_mem_region()              // if(!memblock_is_reserved_noinit())
+                    memmap_init_reserved_range()                   // 初始化预留页的page（不受defer_init影响）
+                        __init_single_page()
+                        __SetPageReserved(page)
+                __free_memory_core(start, end)                     // release free pages to buddy
+                    memblock_free_pages( , order)                  //
+                        early_page_initialised(pfn)                // 如果设置了defer init，则会推迟释放
+                        __free_pages_core()                        // 真释放
         mem_init()
-        kmem_cache_init()                            // 可以用slab了
+        kmem_cache_init()                                          // 可以用slab了
     rest_init()
         kernel_init()
             kernel_init_freeable()
-                smp_init()                           // 在这之前只有单线程, memblock分配只能发生在这之前
+                smp_init()                                         // 在这之前只有单线程, memblock分配只能发生在这之前
                 page_alloc_init_late()
-                    deferred_init_memmap()           // 延迟初始化 page struct，并释放到buddy
-                    memblock_discard()               // discard region array
+                    deferred_init_memmap()                         // 延迟初始化 page struct，并释放到buddy
+                        deferred_init_memmap_job()                 // 这里用的是for_each_free_mem_range()，所以预留空间不会重复初始化
+                    memblock_discard()                             // discard region array
                 do_basic_setup()
                     do_initcalls() -> do_initcall_level()
-                        parse_args()                 // 解析命令行参数
-                        cma_init_reserved_areas()    // 释放cma到buddy (core_initcall)
+                        parse_args()                               // 解析命令行参数
+                        cma_init_reserved_areas()                  // 释放cma到buddy (core_initcall)
             free_initmem()
-                free_kernel_image_pages()            // 释放__init标记的，在__init_begin/end之间的内存
+                free_kernel_image_pages()                          // 释放__init标记的，在__init_begin/end之间的内存
 ```
 
 在x86平台，这个工作就交给了 e820__memblock_setup()，从e820信息中构建了memblock。
