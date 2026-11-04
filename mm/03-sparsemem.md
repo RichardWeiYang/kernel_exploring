@@ -330,5 +330,70 @@ ffffea0000000000 |  -22    TB | ffffeaffffffffff |    1 TB | virtual memory map 
 
 不过这个感觉有点危险，如果那天page里面又塞了啥东西，那就要爆了。不过也由此可见，page里面应该不让轻易随便改动，尤其是加新的值。
 
+## vmemmap的映射和分配
+
+```
+        sparse_init()
+            sparse_metadata_init()
+                // for_each_early_section_nr()                     // 只遍历early section
+                sparse_metadata_init_nid()
+                    sparse_usage_init()                            // 分配usage空间，包含subsection和pageblock
+                    __populate_section_memmap()                    // 拿到mmep，也就是当前section的struct page的内存
+                    sparse_init_one_section()                      // struct page设置到mem_section->section_mem_map，usage设置到usage(包括pageblock)
+```
+
+我们知道page struct的分配在sparse_init()->__populate_section_memmap()按照Section为单位分配和映射. 但具体是怎么做的呢？ 我们这里展开学习一下。
+
+这个过程有很多变体，我们这里先看最基础的：
+
+```
+// 从sparse_metadata_init_nid()调用， pfn是section所含的起始pfn
+__populate_section_memmap(pfn, nr_pages /*=PAGES_PER_SECTION*/, nid, altmap /*=NULL*/, pgmap /*=NULL*/)
+    // [start, end)就是接下来要映射的空间
+    start = (unsigned long) pfn_to_page(pfn)
+    end = start + nr_pages * sizeof(struct page)
+    vmemmap_populate(start, end, nid, altmap/*=NULL*/)
+        vmemmap_populate_basepages(start, end, nid, NULL) -> vmemmap_populate_range(start, end, nid, NULL, -1, 0)
+            // for (; addr < end; addr += PAGE_SIZE)                           // 逐个页面映射
+            vmemmap_populate_address(addr, nid, NULL, -1, 0) -> vmemmap_pte_populate(pmd, addr, nid, NULL, -1, 0);
+
+                pte = pte_offset_kernel(pmd, addr)
+                p = vmemmap_alloc_pte(pfn, nid, NULL, 0)
+                    return vmemmap_alloc_block_buf(PAGE_SIZE, nid, NULL)
+                        return vmemmap_alloc_block(PAGE_SIZE, nid)             // 通过memblock分配一个物理页
+                            return memmap_alloc(PAGE_SIZE, PAGE_SIZE, __pa(MAX_DMA_ADDRESS), nid, false)
+                ptpfn = PHYS_PFN(__pa(p));
+                entry = pfn_pte(ptpfn, PAGE_KERNEL);
+                set_pte_at(&init_mm, addr, pte, entry);                        // 设置到页面上，完成映射
+```
+
+**注**： 这里有个很有意思的地方， **struct page的大小不一定是2的指数次对齐的**.
+
+在struct page定义中我们看到有一个对齐的标志：_struct_page_alignment。
+
+```
+#ifdef CONFIG_HAVE_ALIGNED_STRUCT_PAGE
+#define _struct_page_alignment	__aligned(2 * sizeof(unsigned long))
+#else
+#define _struct_page_alignment	__aligned(sizeof(unsigned long))
+#endif
+```
+
+也就是最多是16字节对齐。那这就有一个问题 --> 某一个struct page会跨越页的边界。
+
+所以在上面分配/映射struct page的过程中，就是按照一页页的方式逐个映射的。
+
+而另一个有意思的地方是： **整个section对应的struct page是页对齐的**。
+
+可以说这是个巧合，也可以说是内核开发者巧妙的安排。计算过程如下：
+
+假设是4K的页，一个section就是128M
+
+那就是128M / 4K = 32K 个页面
+
+所占用的struct page大小是： 32K * S。 这个大小肯定是4K的整数倍。
+
+PS： 但是PAGE_SHIFT可以配置。。。目前不确定如果PAGE_SHIFT变大后section还是128M的话会怎么样。。。
+
 [1]: https://lwn.net/Articles/134804/
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/arch/x86/x86_64/mm.rst
