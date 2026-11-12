@@ -358,12 +358,12 @@ __populate_section_memmap(pfn, nr_pages /*=PAGES_PER_SECTION*/, nid, altmap /*=N
             vmemmap_populate_address(addr, nid, NULL, -1, 0) -> vmemmap_pte_populate(pmd, addr, nid, NULL, -1, 0);
 
                 pte = pte_offset_kernel(pmd, addr)
-                p = vmemmap_alloc_pte(pfn, nid, NULL, 0)
+                p = vmemmap_alloc_pte(pfn, nid, NULL, 0)                       // 返回的是线性映射的虚拟地址
                     return vmemmap_alloc_block_buf(PAGE_SIZE, nid, NULL)
                         return vmemmap_alloc_block(PAGE_SIZE, nid)             // 通过memblock分配一个物理页
                             return memmap_alloc(PAGE_SIZE, PAGE_SIZE, __pa(MAX_DMA_ADDRESS), nid, false)
-                ptpfn = PHYS_PFN(__pa(p));
-                entry = pfn_pte(ptpfn, PAGE_KERNEL);
+                ptpfn = PHYS_PFN(__pa(p));                                     // 转换成pfn
+                entry = pfn_pte(ptpfn, PAGE_KERNEL);                           // pte中写入的是pfn
                 set_pte_at(&init_mm, addr, pte, entry);                        // 设置到页面上，完成映射
 ```
 
@@ -394,6 +394,61 @@ __populate_section_memmap(pfn, nr_pages /*=PAGES_PER_SECTION*/, nid, altmap /*=N
 所占用的struct page大小是： 32K * S。 这个大小肯定是4K的整数倍。
 
 PS： 但是PAGE_SHIFT可以配置。。。目前不确定如果PAGE_SHIFT变大后section还是128M的话会怎么样。。。
+
+## 节约struct page分配的优化
+
+刚才说了， vmemmap的分配/映射有很多优化，这里先看vmemmap_pte_populate()的一个。
+
+**这个优化的作用是减少struct page的分配**
+
+```
+// for (; addr < end; addr += PAGE_SIZE)                                       // 逐个页面映射
+vmemmap_populate_address(addr, nid, NULL, -1, 0)
+    vmemmap_pte_populate(pmd, addr, nid, NULL, -1, 0);
+        pte = pte_offset_kernel(pmd, addr);
+        pfn = page_to_pfn((struct page*)addr);
+        p = vmemmap_alloc_pte(pfn, nid, NULL, 0)
+
+            // 区别在分配页这里
+            if (vmemmap_optimizable_pfn(pfn))
+                // struct page大小必须是2的指数
+                if (!is_power_of_2(sizeof(struct page)))
+                    return false
+                order = pfn_to_section_compound_order(pfn)
+                nr_pages = 1UL << order;
+                return (pfn & (nr_pages - 1)) >= VMEMMAP_OPTIMIZATION_NR_STRUCT_PAGES;
+	    {
+	        // 跳过第一个页后
+                vmemmap_shared_tail_page(order, zone)
+                    idx = order - VMEMMAP_OPTIMIZATION_MIN_ORDER
+                    page = zone->vmemmap_tails[idx]
+                    if (page) return page                                      // 如果已经分配过了，就重用
+
+                    addr = vmemmap_alloc_block(PAGE_SIZE, zone_to_nid(zone))   // 否则的话，再分配
+                    prep_compound_tail()                                       // 当作tail来初始化
+                    page = virt_to_page(addr)                                  // 这里很巧妙，因为实际上这时映射还没有建立
+                    zone->vmemmap_tails[idx] = page
+                    return page
+	    }
+
+        ptpfn = PHYS_PFN(__pa(p));
+        entry = pfn_pte(ptpfn, PAGE_KERNEL)
+        set_pte_at(&init_mm, addr, pte, entry)
+```
+
+这个优化有一个前提条件：populate前我们直到这一段空间内存将一直以大页形式存在。
+
+假设我们直到一端空间一直以2M大页形式存在， 那么就可以将后续的tail指向一个模板。而且这个模板是zone为单位的。
+
+```
+【单个 2MB hugetlb 页的 vmemmap，相对下标】
+vmemmap 虚拟页   大页内 index 范围   内容              PTE 指向
+  #0               [0,  64)         head+63 tail     独立物理页
+  #1               [64,128)         纯 tail           共享模板
+  ...
+  #7               [448,512)        纯 tail           共享模板
+```
+对于能优化的范围(vmemmap_optimizable_pfn(pfn))， 在分配vmemmap的时候就初始化了struct page。所以在memmap_init_range()过程中，回跳过这部分。
 
 [1]: https://lwn.net/Articles/134804/
 [2]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/arch/x86/x86_64/mm.rst
