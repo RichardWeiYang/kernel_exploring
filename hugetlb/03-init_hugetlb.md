@@ -7,7 +7,7 @@ start_kernel()
     setup_arch()
         parse_early_param()
             parse_early_options()
-                parse_args("early options", , do_early_param)      // 只记录命令行参数
+                parse_args("early options", , do_early_param)                // 只记录命令行参数
                 --> default_hugepagesz_setupargs()
                 --> hugepagesz_setupargs()
                 --> hugepages_setupargs()
@@ -18,29 +18,48 @@ start_kernel()
         
         hugetlb_cma_reserve();
         hugetlb_bootmem_alloc();
-            hugetlb_parse_param();                                 // 真正解析命令行参数
+            hugetlb_parse_param();                                           // 真正解析命令行参数，创建相应的hstate
                 --> default_hugepagesz_setup()
                 --> hugepagesz_setup()
                 --> hugepages_setup()
 
-            // for_each_hstate(h), if hstate_is_gigantic(h)        // 先处理超过buddy尺寸的大页
-            hugetlb_hstate_alloc_pages(h)                          // 这里只预留了空间
+            // for_each_hstate(h), if hstate_is_gigantic(h)                  // 先处理超过buddy尺寸的大页
+            hugetlb_hstate_alloc_pages(h)                                    // 预留大尺寸大页内存空间
+                hugetlb_gigantic_pages_alloc_boot(h)
+                    alloc_bootmem_huge_page(h, nid)
+                        hugetlb_vmemmap_optimize_bootmem_page(pfn, )         // 在mem_section上标记compound order                --- (1)
+                        memblock_reserved_mark_noinit(m + PAGE_SIZE, ...)    // 在memblock上标记除了第一个pfn外，其他页为noinit  --- (2)
         
         sparse_init();
+            sparse_metadata_init();
+                sparse_metadata_init_nid()
+                    __populate_section_memmap()                              // 分配memmap, 对于大尺寸大页范围有优化
+                        vmemmap_shared_tail_page()                           // 因为在(1)中记录了compound order, tail则重用模板struct page
         memmap_init();
+            memmap_init_range()
+                if (vmemmap_optimizable_pfn(pfn, order))                     // 跳过模板struct page，在(1)中设置的
+
+    mm_core_init()
+        memblock_free_all()
+            free_low_memory_core_early()
+                memmap_init_reserved_pages()
+                    // if (!memblock_is_reserved_noinit())                   // 跳过在(2)中被标记为noinit的区域,这部分将在gather_bootmem_prealloc_node()中初始化
+                    memmap_init_reserved_range()                             // 初始化大尺寸大页的memmap
 
     rest_init()
         kernel_init()
             kernel_init_freeable()
                 page_alloc_init_late()
+                    deferred_init_memmap()
                     hugetlb_bootmem_struct_page_init()
-                        gather_bootmem_prealloc_node(nid)          // 初始化大尺寸预留内存
+                        gather_bootmem_prealloc_node(nid)                    // 初始化大尺寸预留内存
                 do_basic_setup()
                     do_initcalls()
                         do_initcall_level()
                             do_one_initcall()
                             --> hugetlb_init()
                                     hugetlb_init_hstates()
+                                        hugetlb_hstate_alloc_pages()         // 分配普通大页内存空间
                             --> init_hugetlbfs_fs()
 ```
 
@@ -131,13 +150,13 @@ hstate第一次创建由hugetlb_add_hstate()完成。
     |max_huge_pages                              | 预留总页数
     |max_huge_pages_node[]                       | 每个节点上预留总页数
     |                                            |
-    |nr_huge_pages                               |
-    |nr_huge_pages_node[]                        |
+    |nr_huge_pages                               | 加入到pool的页数
+    |nr_huge_pages_node[]                        | 加入到指定节点的页数
     |                                            |
-    |free_huge_pages                             |
-    |free_huge_pages_node[]                      |
+    |free_huge_pages                             | 空闲大页数
+    |free_huge_pages_node[]                      | 指定节点的空闲大页数
     |                                            |
-    |hugepage_freelists[]                        |
+    |hugepage_freelists[]                        | 空闲大页链表
     |hugepage_activelist                         |
     |    (struct list_head)                      |
     +--------------------------------------------+
@@ -185,16 +204,11 @@ hugetlb_init()
 
 ```
 hugetlb_hstate_alloc_pages(h)
-    hugetlb_hstate_alloc_pages_specific_nodes(h)
-        hugetlb_hstate_alloc_pages_onenode(h)
-
     // 启动时预留大尺寸
     hugetlb_gigantic_pages_alloc_boot(h)
 
     // 启动后，预留内存
     hugetlb_pages_alloc_boot(h)
-
-    hugetlb_hstate_alloc_pages_errcheck()
 ```
 
 针对单node的分配好像不常用，我们先跳过。所以关注点就是
@@ -205,27 +219,80 @@ hugetlb_hstate_alloc_pages(h)
 大尺寸hugetlb的内存预留
 
 ```
-struct list_head huge_boot_pages[MAX_NUMNODES];                    // 预留的内存挂载在链表上
+struct list_head huge_boot_pages[MAX_NUMNODES];                              // 预留的内存挂载在链表上
 
 hugetlb_gigantic_pages_alloc_boot(h)
-    // for (i = 0; i < h->max_huge_pages; ++i), 寸的是页数，所以一个计数就分配一次
+    // for (i = 0; i < h->max_huge_pages; ++i), 单位的是页数，所以一个计数就分配一次
     alloc_bootmem_huge_page(h, NUMA_NO_NODE)
         m = arch_alloc_bootmem_huge_page(h, nid)
             alloc_bootmem(h, nid, false)
-                __memblock_reserve(addr, size)
+                __memblock_reserve(addr, size /*=huge_page_size(h)*/)
                 memblock_prep_allocation(addr, size, true)
                 return phys_to_virt(addr)
 
         list_add_tail(&m->list, &huge_boot_pages[nid])
-        m->flags |= HUGE_BOOTMEM_ZONES_VALID;
+        m->hstate = h;
+        m->flags |= HUGE_BOOTMEM_ZONES_VALID;                                // 标记没有跨zone
         hugetlb_vmemmap_optimize_bootmem_page(pfn, huge_page_order(h))
+            section_set_compound_order_range(pfn, 1UL << order, order)
         // 标注第一个page不需要初始化, 在memmap_init_reserved_pages中跳过
-        memblock_reserved_mark_noinit()
+        memblock_reserved_mark_noinit(m + PAGE_SIZE, huge_page_size(h) - PAGE_SIZE)
 
     // 如果预留的内存区域跨zone， 释放
     hugetlb_free_cross_zone_pages(h, nid)
+        if (!hstate_is_gigantic(h)) return 0;
 
+        // list_for_each_entry_safe(m, tmp, &huge_boot_pages[nid], list)
+        if (m->flags & HUGE_BOOTMEM_ZONES_VALID) break;                      // 标记了有效的，不释放
+
+        list_del(&m->list)
+        memlbock_free(m, huge_page_size(h))
+```
+
+对于大尺寸大页，预留到huge_boot_pages[]链表后，将在gather_bootmem_prealloc_node()中再处理。
 
 ```
+gather_bootmem_prealloc_node(nid)
+    // list_for_each_entry_safe(m, )
+    page = virt_to_page(m)
+    folio = (void *)page
+    h = m->hstate
+
+    hugetlb_folio_init_vmemmap(folio, h, VMEMMAP_OPTIMIZATION_NR_STRUCT_PAGES)
+        hugetlb_folio_init_tail_vmemmap(folio, h, 1, VMEMMAP_OPTIMIZATION_NR_STRUCT_PAGES)
+            __init_single_page(page, pfn, zone, nid);                        // 初始化除了第一个pfn的页
+            prep_compound_tail(page, &folio->page, order);
+            set_page_count(page, 0);
+        prep_compound_head(&folio->page, huge_page_order(h))
+    init_new_hugetlb_folio(folio)
+    folio_set_hugetlb_vmemmap_optimized(folio)
+    section_set_compound_order_range(pfn, folio_nr_pages(folio), 0)
+    list_add(&folio->lru, &folio_list)
+
+    prep_and_add_bootmem_folios(h, &folio_list)
+        enqueue_hugetlb_folio(h, folio)                                      // 添加到hstate空闲列表
+```
+
+正常尺寸hugetlb内存分配
+
+```
+hugetlb_pages_alloc_boot(h)
+    hugetlb_pages_alloc_boot_node()
+        LIST_HEAD(folio_list)
+
+        folio = alloc_pool_huge_folio(h, )
+            folio = alloc_buddy_frozen_folio(order, )
+            init_new_hugetlb_folio(folio)
+                __folio_set_hugetlb(folio)
+            return folio
+        list_move(&folio->lru, &folio_list)
+
+    prep_and_add_allocated_folios(h, &folio_list)                            // 添加到hstate空闲列表
+        // list_for_each_entry_safe(folio, tmp, folio_list, lru)
+        account_new_hugetlb_folio(h, folio)
+        enqueue_hugetlb_folio(h, folio)
+```
+
+分配后，我们可以看到增加了相应的计数，也把folio添加到了空闲列表。
 
 # init_hugetlbfs_fs()
